@@ -51,6 +51,27 @@ h1 span{color:var(--bronze)}
 .tag{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint);
   border:1px solid var(--line);border-radius:2px;padding:3px 8px}
 .hspacer{flex:1}
+.hsave{display:flex;align-items:center;gap:6px;padding-right:12px;margin-right:2px;
+  border-right:1px solid var(--line)}
+.hsave select{font:inherit;font-size:13px;max-width:13rem;width:auto;padding:5px 7px}
+/* .hwrap pose display:flex, ce qui l'emporte sur le display:none de l'attribut hidden :
+   sans cette règle, la barre de nommage resterait visible en permanence. */
+.hbar[hidden]{display:none}
+.hbar{margin-top:12px;gap:8px}
+.hbar label{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint)}
+.hbar input{font:inherit;font-size:14px;background:var(--stone-700);color:var(--ink);
+  border:1px solid var(--line);border-radius:2px;padding:6px 8px;flex:1;min-width:12rem;max-width:34rem}
+.hmsg{margin:8px 0 0;font-size:13px;color:var(--jade);min-height:0}
+.hmsg:empty{display:none}
+.hmsg.souci{color:var(--rust)}
+@media(max-width:760px){
+  /* Sur téléphone la barre passe sous le titre : le menu prend toute la largeur et les
+     deux boutons se rangent dessous, plutôt que de déborder à droite. */
+  .hsave{border-right:0;padding-right:0;margin-right:0;width:100%;order:9;flex-wrap:wrap}
+  .hsave select{flex:1 1 100%;max-width:none;width:100%}
+  .hsave .btn{flex:1}
+  .hbar input{min-width:0}
+}
 .btn{font:inherit;font-size:13px;color:var(--ink-soft);background:none;border:1px solid var(--line);
   border-radius:2px;padding:6px 12px;cursor:pointer}
 .btn:hover{border-color:var(--bronze);color:var(--bronze)}
@@ -217,10 +238,22 @@ footer a{color:var(--bronze)}
 <header>
   <div class="hwrap">
     <h1>Neerya <span>T4c</span> Builder</h1>
-    <span class="tag">Version 5.0</span>
+    <span class="tag">Version 5.1</span>
     <div class="hspacer"></div>
+    <span class="hsave">
+      <select id="psel" aria-label="Mes personnages"></select>
+      <button class="btn fort" id="psave" type="button">Enregistrer</button>
+      <button class="btn" id="plink" type="button">Lien</button>
+    </span>
     <button class="btn" id="tbtn" type="button">Basculer le thème</button>
   </div>
+  <div class="hwrap hbar" id="hbar" hidden>
+    <label id="hbarlbl" for="hbarin">Nom du personnage</label>
+    <input id="hbarin" type="text" autocomplete="off" spellcheck="false">
+    <button class="btn fort" id="hbarok" type="button">Valider</button>
+    <button class="btn" id="hbarno" type="button">Annuler</button>
+  </div>
+  <div class="hwrap"><p class="hmsg" id="hmsg" role="status"></p></div>
 </header>
 
 <main>
@@ -1923,6 +1956,8 @@ function render(){
     ? "<b>Effets non convertis en chiffres :</b><br>"+eq.reste.join("<br>") : "";
 
   recherche(base);
+  /* Toute modification est réenregistrée : revenir sur le site ne doit rien coûter. */
+  if(typeof sauveSession==="function") sauveSession();
 }
 
 function recherche(v){
@@ -2140,16 +2175,347 @@ tb.addEventListener("click",function(){
   try{localStorage.setItem("neerya-theme",next);}catch(err){}
 });
 
+
+/* ---------- sauvegarde et partage des personnages ----------
+   Aucun serveur derrière ce site : tout se joue dans le navigateur du visiteur. Une seule
+   sérialisation alimente les trois usages — la liste locale, le lien de partage, et la
+   reprise automatique de la session en cours. */
+
+var CLE_LISTE="neerya-builds", CLE_SESSION="neerya-session", FORMAT=1;
+
+/* Les sorts sont enregistrés par leur RANG, pas par leur nom : 150 booléens tiennent ainsi
+   en vingt-cinq caractères. Le rang n'a de sens que pour une liste de sorts donnée, d'où
+   cette empreinte, qui refuse la restauration si la base a changé entre-temps. */
+var FP_SORTS=(function(){
+  var h=SORTS.length;
+  SORTS.forEach(function(s,i){
+    for(var j=0;j<s.n.length;j++) h=(h*31+s.n.charCodeAt(j)+i)|0;
+  });
+  return (h>>>0).toString(36);
+})();
+var PAR_NOM_OBJ={}; OBJ.forEach(function(o){ PAR_NOM_OBJ[o.n]=o; });
+
+function bitsVersTexte(bools){
+  var o="";
+  for(var i=0;i<bools.length;i+=6){
+    var v=0;
+    for(var j=0;j<6;j++) if(bools[i+j]) v|=1<<j;
+    o+="0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-_".charAt(v);
+  }
+  return o;
+}
+function texteVersBits(t,n){
+  var A="0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-_", b=[];
+  for(var i=0;i<t.length;i++){
+    var v=A.indexOf(t.charAt(i));
+    for(var j=0;j<6;j++) b.push(!!(v&(1<<j)));
+  }
+  b.length=n; return b;
+}
+function sansZeros(o){
+  var r={}; Object.keys(o).forEach(function(k){ if(o[k]) r[k]=o[k]; });
+  return r;
+}
+
+function etatCourant(){
+  var eq={};
+  SLOTS.forEach(function(sl){ if(S.eq[sl.k]) eq[sl.k]=S.eq[sl.k].n; });
+  return {
+    v:FORMAT, n:S.niveau, r:S.ren, eb:S.ebon?1:0,
+    p:CLES.map(function(k){ return S.pts[k]||0; }),
+    aw:S.anw.choix?[S.anw.choix,S.anw.el]:null,
+    rp:{p:sansZeros(S.rp.puis), r:sansZeros(S.rp.resi)},
+    rg:{s:sansZeros(S.ring.st), pv:S.ring.pv||0,
+        p:sansZeros(S.ring.puis), r:sansZeros(S.ring.resi),
+        c:S.ring.comp.type?[S.ring.comp.type,S.ring.comp.nom]:null},
+    eq:eq, sk:Object.assign({},S.comp),
+    fp:FP_SORTS,
+    sa:bitsVersTexte(SORTS.map(function(x){ return !!S.sappris[x.n]; })),
+    sl:bitsVersTexte(SORTS.map(function(x){ return !!S.sactifs[x.n]; })),
+    go:Object.keys(S.gemOff).filter(function(k){ return S.gemOff[k]; })
+  };
+}
+
+/* Applique un état et renvoie la liste de ce qui n'a pas pu être restauré. Rien ne
+   disparaît en silence : un objet renommé dans le wiki doit être signalé, pas escamoté. */
+function appliquerEtat(o){
+  var soucis=[];
+  if(!o||typeof o!=="object") return ["sauvegarde illisible"];
+  if(o.v>FORMAT) soucis.push("sauvegarde créée par une version plus récente du builder");
+
+  S.ren=Math.max(0,Math.min(2,+o.r||0));
+  S.niveau=Math.max(1,Math.min(MAXLVL,+o.n||1));
+  S.ebon=!!o.eb;
+  CLES.forEach(function(k,i){ S.pts[k]=Math.max(0,(o.p&&+o.p[i])||0); });
+
+  S.anw={choix:(o.aw&&o.aw[0])||"", el:(o.aw&&o.aw[1])||"Feu"};
+  ELEMS.forEach(function(e){
+    S.rp.puis[e]=((o.rp&&o.rp.p&&+o.rp.p[e])||0);
+    S.rp.resi[e]=((o.rp&&o.rp.r&&+o.rp.r[e])||0);
+  });
+
+  var rg=o.rg||{};
+  S.ring={st:{f:0,e:0,d:0,i:0,s:0}, pv:+rg.pv||0, puis:{}, resi:{},
+          comp:{type:(rg.c&&rg.c[0])||"", nom:(rg.c&&rg.c[1])||""}};
+  CLES.forEach(function(k){ S.ring.st[k]=(rg.s&&+rg.s[k])||0; });
+  ELEMS.forEach(function(e){
+    S.ring.puis[e]=(rg.p&&+rg.p[e])||0;
+    S.ring.resi[e]=(rg.r&&+rg.r[e])||0;
+  });
+
+  S.eq={};
+  var perdus=[];
+  SLOTS.forEach(function(sl){
+    var nom=o.eq&&o.eq[sl.k]; if(!nom) return;
+    var obj=PAR_NOM_OBJ[nom];
+    if(!obj){ perdus.push(nom); return; }
+    /* Une cape et des ailes ne sont pas interchangeables : la renaissance tranche. */
+    if(sl.k==="dos" && obj.c!==REN[S.ren].dos){ perdus.push(nom); return; }
+    S.eq[sl.k]=obj;
+  });
+  if(perdus.length) soucis.push(perdus.length+" objet"+(perdus.length>1?"s":"")+
+    " non retrouvé"+(perdus.length>1?"s":"")+" : "+perdus.join(", "));
+
+  S.comp={};
+  var compInconnues=[];
+  Object.keys(o.sk||{}).forEach(function(nom){
+    if(COMP.some(function(c){ return c.n===nom; })) S.comp[nom]=+o.sk[nom]||0;
+    else compInconnues.push(nom);
+  });
+  if(compInconnues.length) soucis.push("compétences inconnues : "+compInconnues.join(", "));
+
+  S.sappris={}; S.sactifs={};
+  if(o.fp && o.fp!==FP_SORTS){
+    soucis.push("les sorts n'ont pas été restaurés : la liste des sorts a changé depuis "+
+                "cette sauvegarde");
+  }else if(o.sa){
+    var ap=texteVersBits(o.sa,SORTS.length), la=texteVersBits(o.sl||"",SORTS.length);
+    SORTS.forEach(function(x,i){
+      if(ap[i]) S.sappris[x.n]=true;
+      if(la[i] && ap[i]) S.sactifs[x.n]=true;
+    });
+  }
+
+  S.gemOff={};
+  (o.go||[]).forEach(function(n){ S.gemOff[n]=true; });
+
+  synchroniseControles();
+  render();
+  return soucis;
+}
+
+/* Les commandes que render() ne rafraîchit pas d'elle-même. */
+function synchroniseControles(){
+  elSeg.querySelectorAll(".seg").forEach(function(x){
+    x.setAttribute("aria-pressed",(+x.dataset.ren===S.ren)?"true":"false");
+  });
+  document.getElementById("ebon").checked=S.ebon;
+  var ra=elAnw.querySelector('input[name="anw"][value="'+S.anw.choix+'"]');
+  if(ra) ra.checked=true;
+  document.getElementById("anwelsel").value=S.anw.el;
+  elRing.querySelectorAll("input[data-ring]").forEach(function(i){
+    var d=i.dataset.ring.split(":"), cat=d[0], cle=d[1];
+    i.value = cat==="pv" ? S.ring.pv
+            : cat==="st" ? (S.ring.st[cle]||0)
+            : ((cat==="puis"?S.ring.puis:S.ring.resi)[cle]||0);
+  });
+  var rc=elRing.querySelector('input[name="rcomp"][value="'+S.ring.comp.type+'"]');
+  if(rc) rc.checked=true;
+  majCompSelect();
+}
+
+function etatVierge(){
+  return {v:FORMAT, n:1, r:0, eb:0, p:[0,0,0,0,0], aw:null,
+          rp:{p:{},r:{}}, rg:{s:{},pv:0,p:{},r:{},c:null},
+          eq:{}, sk:{}, fp:FP_SORTS, sa:"", sl:"", go:[]};
+}
+
+/* ---------- stockage local ---------- */
+function litJSON(cle,defaut){
+  try{ var t=localStorage.getItem(cle); return t?JSON.parse(t):defaut; }
+  catch(err){ return defaut; }
+}
+function ecritJSON(cle,val){
+  try{ localStorage.setItem(cle,JSON.stringify(val)); return true; }
+  catch(err){ return false; }
+}
+function listePersos(){
+  var d=litJSON(CLE_LISTE,null);
+  return (d&&d.v===FORMAT&&d.list)?d.list:{};
+}
+function ecritListe(l){ return ecritJSON(CLE_LISTE,{v:FORMAT,list:l}); }
+
+var nomCourant="";
+
+/* ---------- lien de partage ----------
+   Le texte compressé tient dans l'adresse ; sans CompressionStream on se rabat sur du
+   base64 nu, plus long mais fonctionnel. */
+function b64url(octets){
+  var s=""; octets.forEach(function(o){ s+=String.fromCharCode(o); });
+  return btoa(s).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+}
+function deB64url(t){
+  var s=atob(t.replace(/-/g,"+").replace(/_/g,"/"));
+  var a=new Uint8Array(s.length);
+  for(var i=0;i<s.length;i++) a[i]=s.charCodeAt(i);
+  return a;
+}
+function versCharge(o){
+  var brut=new TextEncoder().encode(JSON.stringify(o));
+  if(typeof CompressionStream!=="function") return Promise.resolve("0"+b64url(brut));
+  return new Response(new Blob([brut]).stream()
+      .pipeThrough(new CompressionStream("deflate-raw"))).arrayBuffer()
+    .then(function(buf){ return "1"+b64url(new Uint8Array(buf)); })
+    .catch(function(){ return "0"+b64url(brut); });
+}
+function depuisCharge(t){
+  var octets=deB64url(t.slice(1));
+  if(t.charAt(0)!=="1")
+    return Promise.resolve(JSON.parse(new TextDecoder().decode(octets)));
+  return new Response(new Blob([octets]).stream()
+      .pipeThrough(new DecompressionStream("deflate-raw"))).text()
+    .then(JSON.parse);
+}
+
+/* ---------- interface ---------- */
+var elPsel=document.getElementById("psel"), elHmsg=document.getElementById("hmsg"),
+    elHbar=document.getElementById("hbar"), elHbarIn=document.getElementById("hbarin"),
+    elHbarLbl=document.getElementById("hbarlbl");
+var barreMode="";
+
+function dis(m,souci){
+  elHmsg.textContent=m||"";
+  elHmsg.classList.toggle("souci",!!souci);
+}
+function majSelect(){
+  var l=listePersos(), noms=Object.keys(l).sort(function(a,b){ return a.localeCompare(b,"fr"); });
+  var h='<option value="">— nouveau personnage —</option>';
+  if(noms.length){
+    h+='<optgroup label="Mes personnages">';
+    noms.forEach(function(n){
+      h+='<option value="p:'+n.replace(/"/g,"&quot;")+'"'+(n===nomCourant?" selected":"")+'>'+
+         n.replace(/</g,"&lt;")+'</option>';
+    });
+    h+='</optgroup>';
+  }
+  if(nomCourant && l[nomCourant])
+    h+='<optgroup label="Gérer"><option value="x:">Supprimer « '+
+       nomCourant.replace(/</g,"&lt;")+' »</option></optgroup>';
+  elPsel.innerHTML=h;
+  if(!nomCourant) elPsel.value="";
+}
+function ouvreBarre(mode,valeur,libelle){
+  barreMode=mode; elHbar.hidden=false;
+  elHbarLbl.textContent=libelle;
+  elHbarIn.value=valeur; elHbarIn.readOnly=(mode==="lien");
+  elHbarIn.focus(); elHbarIn.select();
+}
+function fermeBarre(){ barreMode=""; elHbar.hidden=true; }
+
+function enregistre(nom){
+  nom=(nom||"").trim();
+  if(!nom){ dis("Il faut un nom pour enregistrer.",true); return; }
+  var l=listePersos(); l[nom]=etatCourant();
+  if(!ecritListe(l)){
+    dis("Ce navigateur refuse d'enregistrer — navigation privée ?",true); return;
+  }
+  nomCourant=nom; majSelect();
+  dis("« "+nom+" » enregistré dans ce navigateur.");
+}
+function charge(nom){
+  var l=listePersos(); if(!l[nom]) return;
+  var soucis=appliquerEtat(l[nom]);
+  nomCourant=nom; majSelect();
+  dis(soucis.length ? "« "+nom+" » chargé — "+soucis.join(" · ") : "« "+nom+" » chargé.",
+      soucis.length>0);
+}
+
+elPsel.addEventListener("change",function(){
+  var v=elPsel.value;
+  fermeBarre();
+  if(v===""){ nomCourant=""; appliquerEtat(etatVierge()); majSelect();
+              dis("Nouveau personnage."); return; }
+  if(v.indexOf("x:")===0){
+    var l=listePersos(), n=nomCourant;
+    delete l[n]; ecritListe(l); nomCourant=""; majSelect();
+    dis("« "+n+" » supprimé. Enregistrer le remettrait en place.");
+    return;
+  }
+  charge(v.slice(2));
+});
+
+document.getElementById("psave").addEventListener("click",function(){
+  if(nomCourant){ enregistre(nomCourant); return; }
+  ouvreBarre("nom", "Mon personnage", "Nom du personnage");
+});
+
+document.getElementById("plink").addEventListener("click",function(){
+  versCharge(etatCourant()).then(function(charge){
+    var url=location.origin+location.pathname+"#p="+charge;
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(url).then(function(){
+        dis("Lien copié — il contient le personnage en entier.");
+      }).catch(function(){ ouvreBarre("lien",url,"Copie ce lien"); });
+    }else ouvreBarre("lien",url,"Copie ce lien");
+  }).catch(function(){ dis("Le lien n'a pas pu être fabriqué.",true); });
+});
+
+document.getElementById("hbarok").addEventListener("click",function(){
+  if(barreMode==="nom") enregistre(elHbarIn.value);
+  fermeBarre();
+});
+document.getElementById("hbarno").addEventListener("click",fermeBarre);
+elHbarIn.addEventListener("keydown",function(e){
+  if(e.key==="Enter"){ if(barreMode==="nom") enregistre(elHbarIn.value); fermeBarre(); }
+  if(e.key==="Escape") fermeBarre();
+});
+
+/* Reprise de la session : un visiteur qui n'a rien enregistré ne doit pas tout refaire. */
+var sauveDiffere=null;
+function sauveSession(){
+  clearTimeout(sauveDiffere);
+  sauveDiffere=setTimeout(function(){
+    ecritJSON(CLE_SESSION,{v:FORMAT,nom:nomCourant,etat:etatCourant()});
+  },600);
+}
+
+function demarrePersos(){
+  majSelect();
+  var h=location.hash;
+  if(h.indexOf("#p=")===0){
+    depuisCharge(h.slice(3)).then(function(o){
+      var soucis=appliquerEtat(o);
+      /* L'adresse est nettoyée aussitôt : elle ne doit pas continuer à décrire un
+         personnage que l'on va modifier. Le bouton « Lien » en refabrique un à la demande. */
+      history.replaceState(null,"",location.pathname+location.search);
+      dis(soucis.length ? "Personnage partagé chargé — "+soucis.join(" · ")
+                        : "Personnage partagé chargé.", soucis.length>0);
+    }).catch(function(){
+      history.replaceState(null,"",location.pathname+location.search);
+      dis("Ce lien de personnage est illisible.",true);
+    });
+    return;
+  }
+  var ses=litJSON(CLE_SESSION,null);
+  if(ses && ses.v===FORMAT && ses.etat){
+    nomCourant=ses.nom||""; appliquerEtat(ses.etat); majSelect();
+    if(nomCourant) dis("« "+nomCourant+" » repris là où tu l'avais laissé.");
+    else dis("Session précédente reprise.");
+  }
+}
+
 /* Point d'entrée de diagnostic : permet d'auditer depuis l'extérieur ce que l'analyseur
    de bonus reconnaît et ce qu'il laisse passer, sans dupliquer son code. */
 var TRAITES_A_PART={};
 Object.keys(ORBES_SET).forEach(function(n){TRAITES_A_PART[n]=true;});
 Object.keys(OBJETS_CONDITIONNELS).forEach(function(n){TRAITES_A_PART[n]=true;});
 window.__diag={analyse:analyse, coupePassif:coupePassif, resume:resumeFx,
+               etatCourant:etatCourant, versCharge:versCharge, appliquerEtat:appliquerEtat,
                descriptionObjet:descriptionObjet, bonusLisibles:bonusLisibles,
                traitesAPart:TRAITES_A_PART};
 document.getElementById("nbobj").textContent=OBJ.length;
 render();
+demarrePersos();
 })();
 </script>
 

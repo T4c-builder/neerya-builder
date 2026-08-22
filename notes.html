@@ -51,6 +51,27 @@ h1 span{color:var(--bronze)}
 .tag{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint);
   border:1px solid var(--line);border-radius:2px;padding:3px 8px}
 .hspacer{flex:1}
+.hsave{display:flex;align-items:center;gap:6px;padding-right:12px;margin-right:2px;
+  border-right:1px solid var(--line)}
+.hsave select{font:inherit;font-size:13px;max-width:13rem;width:auto;padding:5px 7px}
+/* .hwrap pose display:flex, ce qui l'emporte sur le display:none de l'attribut hidden :
+   sans cette règle, la barre de nommage resterait visible en permanence. */
+.hbar[hidden]{display:none}
+.hbar{margin-top:12px;gap:8px}
+.hbar label{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint)}
+.hbar input{font:inherit;font-size:14px;background:var(--stone-700);color:var(--ink);
+  border:1px solid var(--line);border-radius:2px;padding:6px 8px;flex:1;min-width:12rem;max-width:34rem}
+.hmsg{margin:8px 0 0;font-size:13px;color:var(--jade);min-height:0}
+.hmsg:empty{display:none}
+.hmsg.souci{color:var(--rust)}
+@media(max-width:760px){
+  /* Sur téléphone la barre passe sous le titre : le menu prend toute la largeur et les
+     deux boutons se rangent dessous, plutôt que de déborder à droite. */
+  .hsave{border-right:0;padding-right:0;margin-right:0;width:100%;order:9;flex-wrap:wrap}
+  .hsave select{flex:1 1 100%;max-width:none;width:100%}
+  .hsave .btn{flex:1}
+  .hbar input{min-width:0}
+}
 .btn{font:inherit;font-size:13px;color:var(--ink-soft);background:none;border:1px solid var(--line);
   border-radius:2px;padding:6px 12px;cursor:pointer}
 .btn:hover{border-color:var(--bronze);color:var(--bronze)}
@@ -299,6 +320,17 @@ footer a{color:var(--bronze)}
         <div class="note good">
           <b>Points de compétence.</b> Quinze par montée de niveau, donc aucun au niveau 1 —
           <i>vérifié en jeu</i>. Même comptage que pour les points de caractéristique.
+        </div>
+        <div class="note good">
+          <b>Sauvegarde des personnages.</b> Le site n'a pas de serveur : rien ne sort du
+          navigateur du visiteur. Les personnages enregistrés vivent dans le stockage local du
+          navigateur — ils survivent à la fermeture de l'onglet et à l'extinction de la machine,
+          mais pas au vidage du cache ni au changement d'appareil. Le bouton <b>Lien</b>
+          répond à cette limite : il encode le personnage entier dans l'adresse, compressée puis
+          transcrite en base64, soit trois à sept cents caractères. Ce lien est à la fois un
+          partage et une sauvegarde qui traverse les machines. La session en cours est
+          réenregistrée à chaque modification : revenir sur le site ne coûte rien, même sans
+          avoir cliqué sur Enregistrer.
         </div>
         <div class="note flag">
           <b>Bonus en texte libre.</b> Le wiki écrit la même chose de dix façons : « +5 puissance
