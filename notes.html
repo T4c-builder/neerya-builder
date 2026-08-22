@@ -277,6 +277,17 @@ footer a{color:var(--bronze)}
           Deux anneaux, un bracelet, une amulette et une orbe, comme sur la fiche du jeu.
         </div>
         <div class="note good">
+          <b>Arrondi au plus proche.</b> Toutes les formules du moteur — pourcentages, gemmes,
+          sorts, classe d'armure — rendent un entier <b>arrondi au plus proche</b>, jamais
+          tronqué. L'arrondi porte toujours sur la <b>somme</b>, jamais sur chaque terme : les six
+          pièces d'une armure valant 1,6 + 5,9 + 1,9 + 1,7 + 1,7 + 1,3 donnent 14, et non les 15
+          qu'aurait donnés l'addition des six valeurs arrondies séparément.
+          Deux exceptions à la règle, qui n'en sont pas : les <i>paliers</i> de points de vie et
+          de mana, et la <i>tranche</i> de 10 d'endurance du talisman centaure. Là, la partie
+          entière n'est pas un arrondi mais la définition même du seuil — 19 d'endurance reste
+          au palier 0, elle n'est pas « proche » du palier 1.
+        </div>
+        <div class="note good">
           <b>Les pourcentages portent sur la valeur pure.</b> Qu'ils viennent d'un sort ou d'un
           objet, ils se calculent sur le chiffre blanc, jamais sur une valeur déjà boostée. Vrai
           pour les caractéristiques, les compétences, les puissances et résistances, et les
@@ -309,7 +320,7 @@ footer a{color:var(--bronze)}
         </div>
         <div class="note flag">
           <b>Effets des sorts.</b> Le wiki décrit les bonus en toutes lettres et de façons trop
-          variées pour être lues automatiquement sans risque. Vingt-deux sorts ont donc leurs
+          variées pour être lues automatiquement sans risque. Vingt-neuf sorts ont donc leurs
           effets saisis à la main, vérifiables un par un. Les autres coûtent bien leurs
           points de compétence mais n'appliquent aucun bonus chiffré.
         </div>
@@ -320,6 +331,19 @@ footer a{color:var(--bronze)}
         <div class="note good">
           <b>Points de compétence.</b> Quinze par montée de niveau, donc aucun au niveau 1 —
           <i>vérifié en jeu</i>. Même comptage que pour les points de caractéristique.
+        </div>
+        <div class="note good">
+          <b>Sorts à formule.</b> Onze sorts n'appliquent pas un pourcentage fixe mais une
+          formule. Huit d'entre eux donnent de la classe d'armure ou de la force, et lisent des
+          valeurs <b>boostées</b> : Protection (sag ÷ 50 + int ÷ 100 + 3), Peau de pierre
+          (sag ÷ 13 + int ÷ 25 + 10), Barrière de protection (5 + int ÷ 50 + sag ÷ 25),
+          Cocon de la nature (2 + end × 5 ÷ 58), et Force de la terre
+          (sag ÷ 15 + int ÷ 20 + 10) en force. Sa variante <i>transfert</i> donne le même total,
+          dont 33 % basculent en endurance. Résistance du golem cumule Protection et Peau de
+          pierre, en arrondissant la somme des deux formules exactes et non chacune séparément ;
+          Déviation de la sirène reprend la classe d'armure de la Barrière de protection, le
+          Bouclier de mana n'en donnant pas — <i>confirmé en jeu</i> — seulement ses +33 % de
+          résistances. Ailleurs, chaque sort est arrondi séparément avant addition.
         </div>
         <div class="note good">
           <b>Saisie des valeurs.</b> Les champs de caractéristique, de compétence et d'anneau ne
