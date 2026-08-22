@@ -238,7 +238,7 @@ footer a{color:var(--bronze)}
 <header>
   <div class="hwrap">
     <h1>Neerya <span>T4c</span> Builder</h1>
-    <span class="tag">Version 5.1</span>
+    <span class="tag">Version 5.2</span>
     <div class="hspacer"></div>
     <span class="hsave">
       <select id="psel" aria-label="Mes personnages"></select>
@@ -465,7 +465,9 @@ var PARSLOT={};
 OBJ.forEach(function(o,idx){ o.__i=idx; (PARSLOT[o.s]=PARSLOT[o.s]||[]).push(o); });
 /* Tri par famille d'abord : sinon les groupes du menu déroulant se répètent. */
 function triCatalogue(a,b){
-  return a.f.localeCompare(b.f,"fr") || (a.rf||0)-(b.rf||0) || a.n.localeCompare(b.n,"fr");
+  /* Tri alphabétique pur : les familles du wiki ne sont d'aucune aide quand on cherche un
+     objet dont on ne se rappelle que le nom. */
+  return a.n.localeCompare(b.n,"fr",{numeric:true});
 }
 Object.keys(PARSLOT).forEach(function(k){ PARSLOT[k].sort(triCatalogue); });
 
@@ -1665,14 +1667,11 @@ function remplirSelects(v){
     var cur=S.eq[sl.k];
     if(cur && dispo.indexOf(cur)<0) dispo=[cur].concat(dispo);
     var html='<option value="">— aucun ('+dispo.length+' dispo) —</option>';
-    var fam=null;
     dispo.forEach(function(o){
-      if(o.f!==fam){ if(fam!==null)html+='</optgroup>'; html+='<optgroup label="'+o.f+'">'; fam=o.f; }
       var ok=accessible(o,v);
       html+='<option value="'+o.__i+'"'+(cur===o?' selected':'')+'>'+
             (ok?"":"⚠ ")+o.n+(reqTexte(o)?"  ["+reqTexte(o)+"]":"")+'</option>';
     });
-    if(fam!==null)html+='</optgroup>';
     sel.innerHTML=html;
     var ei=document.getElementById("ei-"+sl.k);
     if(cur){
@@ -2014,13 +2013,17 @@ elStats.addEventListener("click",function(e){
   render();
 });
 
-elStats.addEventListener("input",function(e){
-  var inp=e.target.closest(".statin"); if(!inp)return;
-  var k=inp.dataset.k;
-  if(inp.value==="") return;                /* on laisse le champ vide le temps de la saisie */
-  var socle=baseStat();
+/* La saisie n'est jamais corrigée en cours de frappe : effacer le « 2 » de 20 pour taper 80
+   passerait par 0, que le contrôle refuserait aussitôt. On attend donc que le joueur ait fini
+   — Entrée, ou sortie du champ — puis on ramène la valeur au possible le plus proche. */
+function valideStat(inp){
+  var k=inp.dataset.k, socle=baseStat();
+  if(inp.value.trim()===""){ inp.value=socle+S.pts[k]; return; }
   var vise=Math.round(+inp.value);
-  if(isNaN(vise)){ alerte("Valeur non numérique."); return; }
+  if(isNaN(vise)){
+    alerte("Valeur non numérique : "+LIB[k][0]+" est laissée à "+(socle+S.pts[k])+".");
+    inp.value=socle+S.pts[k]; return;
+  }
   var dispo=totalPts()-utilises()+S.pts[k]; /* points mobilisables sur cette caractéristique */
   var plafond=socle+dispo;
   if(vise<socle){
@@ -2030,18 +2033,23 @@ elStats.addEventListener("input",function(e){
     alerte("Il ne reste que "+(totalPts()-utilises())+" point"+((totalPts()-utilises())>1?"s":"")+
            " à répartir : "+LIB[k][0]+" est plafonnée à "+plafond+".");
     vise=plafond;
-  }else{
-    alerte("");
-  }
+  }else alerte("");
   S.pts[k]=vise-socle;
+  inp.value=vise;
   render();
-  if(+inp.value!==vise) inp.value=vise;
+}
+elStats.addEventListener("change",function(e){
+  var inp=e.target.closest(".statin"); if(inp) valideStat(inp);
 });
-
-/* un champ laissé vide reprend sa valeur au moment où on le quitte */
+elStats.addEventListener("keydown",function(e){
+  var inp=e.target.closest(".statin"); if(!inp)return;
+  if(e.key==="Enter"){ e.preventDefault(); valideStat(inp); }
+  if(e.key==="Escape"){ inp.value=baseStat()+S.pts[inp.dataset.k]; alerte(""); }
+});
+/* Un champ quitté sans modification, ou vidé, retrouve sa valeur. */
 elStats.addEventListener("blur",function(e){
   var inp=e.target.closest(".statin"); if(!inp)return;
-  if(inp.value==="") render();
+  if(inp.value.trim()==="") inp.value=baseStat()+S.pts[inp.dataset.k];
 },true);
 var elSeg=document.querySelector(".segwrap");
 elSeg.addEventListener("click",function(e){
@@ -2091,14 +2099,28 @@ document.querySelector("main").addEventListener("change",function(e){
   else { delete S.comp[nom]; }
   calerte(""); render();
 });
-document.querySelector("main").addEventListener("input",function(e){
-  var inp=e.target.closest("[data-skv]"); if(!inp)return;
-  if(inp.value==="")return;
-  var nom=inp.dataset.skv, vise=Math.round(+inp.value)||0;
+/* Même principe que pour les caractéristiques : on ne corrige qu'une fois la frappe finie. */
+function valideComp(inp){
+  var nom=inp.dataset.skv;
+  if(inp.value.trim()===""){ inp.value=S.comp[nom]||0; return; }
+  var vise=Math.round(+inp.value);
+  if(isNaN(vise)){ inp.value=S.comp[nom]||0; return; }
   majSkPoints(nom,vise);
+  inp.value=S.comp[nom]||0;
   render();
-  if(+inp.value!==S.comp[nom]) inp.value=S.comp[nom];
+}
+document.querySelector("main").addEventListener("change",function(e){
+  var inp=e.target.closest("[data-skv]"); if(inp) valideComp(inp);
 });
+document.querySelector("main").addEventListener("keydown",function(e){
+  var inp=e.target.closest("[data-skv]"); if(!inp)return;
+  if(e.key==="Enter"){ e.preventDefault(); valideComp(inp); }
+  if(e.key==="Escape"){ inp.value=S.comp[inp.dataset.skv]||0; calerte(""); }
+});
+document.querySelector("main").addEventListener("blur",function(e){
+  var inp=e.target.closest("[data-skv]"); if(!inp)return;
+  if(inp.value.trim()==="") inp.value=S.comp[inp.dataset.skv]||0;
+},true);
 document.querySelector("main").addEventListener("click",function(e){
   var b=e.target.closest("[data-skmax]"); if(!b)return;
   var nom=b.dataset.skmax;
@@ -2110,9 +2132,16 @@ document.getElementById("skall").addEventListener("change",function(e){
 });
 
 var elRing=document.getElementById("ringform");
-elRing.addEventListener("input",function(e){
-  var inp=e.target.closest("input[data-ring]"); if(!inp)return;
+function valeurRing(inp){
+  var d=inp.dataset.ring.split(":");
+  return d[0]==="pv" ? S.ring.pv
+       : d[0]==="st" ? (S.ring.st[d[1]]||0)
+       : ((d[0]==="puis"?S.ring.puis:S.ring.resi)[d[1]]||0);
+}
+/* Même principe encore : la correction attend la fin de la saisie. */
+function valideRing(inp){
   var parts=inp.dataset.ring.split(":"), cat=parts[0], cle=parts[1];
+  if(inp.value.trim()===""){ inp.value=valeurRing(inp); return; }
   var v=Math.max(0,Math.round(+inp.value)||0);
   alerte("");
   if(cat==="st"){
@@ -2134,10 +2163,20 @@ elRing.addEventListener("input",function(e){
     }
     pool[cle]=v;
   }
-  if(+inp.value!==v) inp.value=v;
+  inp.value=v;
   render();
+}
+elRing.addEventListener("keydown",function(e){
+  var inp=e.target.closest("input[data-ring]"); if(!inp)return;
+  if(e.key==="Enter"){ e.preventDefault(); valideRing(inp); }
+  if(e.key==="Escape"){ inp.value=valeurRing(inp); alerte(""); }
 });
+elRing.addEventListener("blur",function(e){
+  var inp=e.target.closest("input[data-ring]"); if(!inp)return;
+  if(inp.value.trim()==="") inp.value=valeurRing(inp);
+},true);
 elRing.addEventListener("change",function(e){
+  var inp=e.target.closest("input[data-ring]"); if(inp){ valideRing(inp); return; }
   var r=e.target.closest('input[name="rcomp"]');
   if(r){ S.ring.comp.type=r.value; majCompSelect(); render(); return; }
   if(e.target.closest("#rcompnom")){ S.ring.comp.nom=e.target.value; render(); }
