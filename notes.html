@@ -277,19 +277,23 @@ footer a{color:var(--bronze)}
           Deux anneaux, un bracelet, une amulette et une orbe, comme sur la fiche du jeu.
         </div>
         <div class="note good">
-          <b>Arrondi au plus proche.</b> Toutes les formules du moteur — pourcentages, gemmes,
-          sorts, classe d'armure — rendent un entier <b>arrondi au plus proche</b>, jamais
-          tronqué. L'arrondi porte toujours sur la <b>somme</b>, jamais sur chaque terme : les six
-          pièces d'une armure valant 1,6 + 5,9 + 1,9 + 1,7 + 1,7 + 1,3 donnent 14, et non les 15
-          qu'aurait donnés l'addition des six valeurs arrondies séparément.
-          Deux exceptions à la règle, qui n'en sont pas : les <i>paliers</i> de points de vie et
+          <b>Arrondi au plus proche.</b> Les formules du moteur rendent un entier <b>arrondi au
+          plus proche</b>, et l'arrondi porte toujours sur la <b>somme</b>, jamais sur chaque
+          terme : les six pièces d'une armure valant 1,6 + 5,9 + 1,9 + 1,7 + 1,7 + 1,3 donnent
+          14, et non les 15 qu'aurait donnés l'addition des six valeurs arrondies séparément.
+          <b>La classe d'armure fait exception</b> : le jeu la tronque, sort par sort puis sur
+          le total. Deux autres exceptions n'en sont pas : les <i>paliers</i> de points de vie et
           de mana, et la <i>tranche</i> de 10 d'endurance du talisman centaure. Là, la partie
           entière n'est pas un arrondi mais la définition même du seuil — 19 d'endurance reste
           au palier 0, elle n'est pas « proche » du palier 1.
         </div>
         <div class="note good">
-          <b>Les pourcentages portent sur la valeur pure.</b> Qu'ils viennent d'un sort ou d'un
-          objet, ils se calculent sur le chiffre blanc, jamais sur une valeur déjà boostée. Vrai
+          <b>Les pourcentages portent sur la valeur pure, et une source à la fois.</b> Qu'ils
+          viennent d'un sort ou d'un objet, ils se calculent sur le chiffre blanc, jamais sur
+          une valeur déjà boostée — et chaque source est calculée puis tronquée séparément,
+          jamais cumulée avec les autres avant d'être appliquée. Un tiers sur 757 de sagesse
+          donne 252, un 5 % sur la même base donne 37, et le total est 289 : appliquer 38,33 %
+          d'un bloc en aurait donné 290. Vrai
           pour les caractéristiques, les compétences, les puissances et résistances, et les
           points de vie : un « +5 % de vie » d'équipement se calcule sur les points de vie
           donnés par les niveaux et l'endurance de base, avant tout autre apport.
@@ -306,6 +310,21 @@ footer a{color:var(--bronze)}
           <b>Gemmes et talismans.</b> Le bonus est calculé à partir des totaux annoncés sur la
           page des sets d'armure, et non des valeurs par pièce indiquées sur chaque objet, les
           deux ne se recoupant pas toujours.
+        </div>
+        <div class="note good">
+          <b>Personnage de référence.</b> Le moteur est calé sur un personnage réel, Aioras,
+          niveau 187, relevé en jeu dans <b>huit états successifs</b> : nu, puis rhabillé pièce par
+          pièce, grimoire éteint puis allumé. Trente et une valeurs en tout, rejouées à chaque
+          modification du code, et trente concordent. Ce sont elles qui ont établi les règles
+          d'arrondi : le « 33 % » du wiki vaut un <b>tiers</b> ; les pourcentages s'appliquent
+          <b>source par source</b>, chacun tronqué, et non cumulés puis appliqués d'un bloc ;
+          chaque sort est tronqué <b>en bloc</b>, formule entière d'un coup ; la Résistance du
+          golem additionne Protection et Peau de pierre déjà tronquées chacune de son côté ;
+          et le Magocrate tronque sa puissance par pièce, sa résistance sur le total, tout en
+          arrondissant sa caractéristique par pièce.
+          <b>Un écart reste ouvert</b>, d'un point de classe d'armure sur un seul des huit
+          états : il tient à la classe d'armure exacte du Ceinturon du Magocrate, que le wiki
+          arrondit à 1,3 et que les relevés situent plutôt vers 1,4.
         </div>
         <div class="note good">
           <b>Protection du Magocrate.</b> Le grimoire ne donne pas des chiffres fixes mais trois
@@ -326,7 +345,9 @@ footer a{color:var(--bronze)}
         </div>
         <div class="note good">
           <b>Compétences innées.</b> Attaque, archerie et esquive n'ont aucun plafond
-          d'entraînement — <i>vérifié en jeu</i>. Les autres plafonnent à 100.
+          d'entraînement et démarrent à <b>15 points offerts</b> — <i>vérifié en jeu</i>. Ces
+          quinze points ne coûtent rien au budget, comme les 20, 25 ou 30 de départ des
+          caractéristiques. Les autres compétences plafonnent à 100.
         </div>
         <div class="note good">
           <b>Points de compétence.</b> Quinze par montée de niveau, donc aucun au niveau 1 —
