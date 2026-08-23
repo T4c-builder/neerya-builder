@@ -312,16 +312,18 @@ footer a{color:var(--bronze)}
           deux ne se recoupant pas toujours.
         </div>
         <div class="note good">
-          <b>Personnage de référence.</b> Le moteur est calé sur un personnage réel, Aioras,
-          niveau 187, relevé en jeu dans <b>huit états successifs</b> : nu, puis rhabillé pièce par
-          pièce, grimoire éteint puis allumé. Trente et une valeurs en tout, rejouées à chaque
-          modification du code, et trente concordent. Ce sont elles qui ont établi les règles
-          d'arrondi : le « 33 % » du wiki vaut un <b>tiers</b> ; les pourcentages s'appliquent
-          <b>source par source</b>, chacun tronqué, et non cumulés puis appliqués d'un bloc ;
-          chaque sort est tronqué <b>en bloc</b>, formule entière d'un coup ; la Résistance du
-          golem additionne Protection et Peau de pierre déjà tronquées chacune de son côté ;
-          et le Magocrate tronque sa puissance par pièce, sa résistance sur le total, tout en
-          arrondissant sa caractéristique par pièce.
+          <b>Personnages de référence.</b> Le moteur est calé sur deux personnages réels.
+          <b>Aioras</b>, niveau 187, relevé en jeu dans <b>huit états successifs</b> : nu, puis
+          rhabillé pièce par pièce, grimoire éteint puis allumé. Trente et une valeurs en tout,
+          rejouées à chaque modification du code, et trente concordent. Ce sont elles qui ont
+          établi les règles d'arrondi : le « 33 % » du wiki vaut un <b>tiers</b> ; les
+          pourcentages s'appliquent <b>source par source</b>, chacun tronqué, et non cumulés
+          puis appliqués d'un bloc ; chaque sort est tronqué <b>en bloc</b>, formule entière
+          d'un coup ; la Résistance du golem additionne Protection et Peau de pierre déjà
+          tronquées chacune de son côté ; et le Magocrate tronque sa puissance par pièce, sa
+          résistance sur le total. <b>Elsa</b>, niveau 220, relevée pièce par pièce jusqu'à
+          l'armure Magocrate complète, a ensuite montré que la caractéristique, elle, dépend
+          d'un <b>palier</b> — voir ci-dessous.
           <b>Un écart reste ouvert</b>, d'un point de classe d'armure sur un seul des huit
           états : il tient à la classe d'armure exacte du Ceinturon du Magocrate, que le wiki
           arrondit à 1,3 et que les relevés situent plutôt vers 1,4.
@@ -332,10 +334,25 @@ footer a{color:var(--bronze)}
           intelligence pure pour feu, eau et nécromancie ; sagesse pure pour terre et lumière ;
           sagesse + intelligence pures moins 100 pour l'air. Divisée par 200, cette valeur donne
           la puissance par pièce, par 400 la résistance ; les deux doublent à l'armure complète.
-          Le bonus de caractéristique, relevé en jeu, donne la plus haute des deux valeurs pures
-          divisée par 35 à elle-même, et 1,5 point fixe à l'autre, par pièce. La classe d'armure
-          prend la somme des deux valeurs pures moins 100, divisée par 140, tronquée par pièce.
-          Aucun de ces bonus n'est plafonné.
+          La classe d'armure prend la somme des deux valeurs pures moins 100, divisée par 140,
+          tronquée par pièce. Aucun de ces bonus n'est plafonné.
+        </div>
+        <div class="note good">
+          <b>Le palier du Magocrate.</b> Le wiki annonce « +20 par pièce au dernier palier » et
+          précise que les bonus dépendent « des paliers d'intelligence et/ou de sagesse ». Le
+          <b>palier est la centaine de la caractéristique pure la plus haute</b> — 757 de sagesse
+          donnent 7, 981 en donnent 9 — et le bonus par pièce vaut
+          <b>valeur pure × palier ÷ 240</b> pour cette caractéristique,
+          <b>÷ 400</b> pour l'autre, tronqué sur le total et majoré de moitié à l'armure
+          complète (× 1,5, là où la puissance et les résistances doublent).
+          Les dix-huit relevés en jeu des deux personnages sortent juste. Aucune loi de la forme
+          « valeur pure ÷ constante » ne peut les rendre tous les deux : c'est l'escalier du
+          palier qui fait la différence. Le diviseur 240 est d'ailleurs le seul entier possible,
+          l'intervalle admissible allant de 239,92 à 240,06.
+          <b>Point ouvert :</b> les diviseurs de la puissance (200), des résistances (400) et de
+          la classe d'armure (140) ont tous été calés sur des personnages de palier 7. Ils
+          valent peut-être eux aussi « × palier ÷ (7 × constante) ». Un relevé sur un
+          personnage d'un autre palier tranchera.
         </div>
         <div class="note flag">
           <b>Effets des sorts.</b> Le wiki décrit les bonus en toutes lettres et de façons trop
