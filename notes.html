@@ -101,10 +101,8 @@ input:focus-visible,select:focus-visible{outline:2px solid var(--bronze);outline
 
 .pool{display:flex;align-items:baseline;gap:8px;padding:9px 12px;border-radius:2px;
   background:var(--bronze-glow);border:1px solid var(--line-soft)}
-.pool b{font-family:Cinzel,serif;font-size:22px;color:var(--bronze-bright)}
 .pool.over{background:#9b342118;border-color:var(--rust)}
 .pool.over b{color:var(--rust)}
-.pool .lbl{font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft)}
 
 .stat{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;justify-content:space-between}
 .stat .name{display:flex;flex-direction:column;min-width:120px;flex:1}
@@ -201,11 +199,6 @@ input:focus-visible,select:focus-visible{outline:2px solid var(--bronze);outline
 .vital .v{font-family:Cinzel,serif;font-size:26px;color:var(--bronze-bright);font-variant-numeric:tabular-nums;line-height:1.25}
 .vital .r{font-size:12.5px;color:var(--ink-soft);font-variant-numeric:tabular-nums}
 
-.tier{display:flex;flex-direction:column;gap:4px}
-.tier .top{display:flex;justify-content:space-between;gap:10px;font-size:13.5px;align-items:baseline}
-.tier .top .g{color:var(--ink-soft);font-variant-numeric:tabular-nums;white-space:nowrap}
-.bar{height:5px;background:var(--stone-700);border-radius:3px;overflow:hidden}
-.bar i{display:block;height:100%;background:var(--bronze);border-radius:3px;transition:width .18s}
 
 /* équipement */
 .slot{display:grid;grid-template-columns:96px minmax(0,1fr) auto;gap:9px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line-soft)}
@@ -219,7 +212,6 @@ input:focus-visible,select:focus-visible{outline:2px solid var(--bronze);outline
 .slot.bloque select{cursor:not-allowed}
 .eqinfo .st{color:var(--bronze)}
 
-.blist{display:flex;flex-direction:column;gap:7px}
 .brow{display:flex;justify-content:space-between;gap:12px;font-size:14.5px;padding-bottom:6px;border-bottom:1px solid var(--line-soft)}
 .brow:last-child{border-bottom:none}
 .brow b{font-family:Cinzel,serif;color:var(--bronze-bright);font-variant-numeric:tabular-nums;font-weight:600}
@@ -253,8 +245,18 @@ footer a{color:var(--bronze)}
           <b>Modèle de gain calibré sur des personnages réels.</b> Le jeu n'applique pas le palier
           final depuis le niveau 1. Il recalcule les gains comme si la caractéristique avait été
           montée au rythme maximum de 5 points par niveau : les premiers niveaux rapportent moins,
-          puis le gain devient linéaire. Vérifié sur trois personnages des niveaux 150 à 187, avec
-          des écarts de 1 à 28 points sur des totaux de 1 271 à 3 231.
+          puis le gain devient linéaire. Et le <b>gain précède la dépense</b> : à chaque montée, le
+          jeu lit la caractéristique telle qu'elle est encore, avant que les cinq points du niveau
+          ne soient placés. Un personnage à 995 d'endurance l'a établi — 6 162 points de vie en jeu
+          là où l'autre lecture en calculait 6 232, six écarts-types du tirage.
+        </div>
+        <div class="note flag">
+          <b>Le modèle des points de vie est une estimation haute.</b> Il suppose que chaque point
+          est versé dans la caractéristique dès qu'il est gagné. Un joueur qui monte son endurance
+          plus tard aura moins de points de vie, et rien dans la fiche finale ne permet de le
+          savoir : deux personnages aux mêmes caractéristiques peuvent différer. Écarts à la
+          moyenne sur les quatre personnages relevés : +21, +1, −7 et +22 points de vie, +5, −11 et
+          −1 points de mana — l'amplitude du tirage est de ±11 sur des totaux de cet ordre.
         </div>
         <div class="note good">
           <b>Le gain par niveau est un tirage aléatoire</b> dans la fourchette du palier. Le chiffre
@@ -388,7 +390,11 @@ footer a{color:var(--bronze)}
           « +N à toutes les résistances ». Le 5 000 vaut immunité, pas une valeur à majorer.
         </div>
         <div class="note good">
-          <b>« OU » veut dire ou.</b> « +15 force OU dextérité OU intelligence OU sagesse » ne
+          <b>« OU » veut dire ou.</b> Vrai aussi des puissances : « +30 puissance feu OU eau
+          (suivant l'élément dominant) » n'en sert qu'une seule, la plus haute BOOSTÉE de celles
+          que l'objet nomme. Sept robes suivent ce patron — Tissage du Roy Noir, Chandail rubis,
+          Tunique du Néant, Toge d'Una, Chaînes de Saehrimni solides et les deux Atours du roi
+          barbare. Et vrai des caractéristiques : « +15 force OU dextérité OU intelligence OU sagesse » ne
           donne pas +15 aux quatre : il donne +15 à la plus haute des valeurs <b>pures</b>
           citées. Quatorze objets étaient concernés — le Bouclier argenté prismatique, les sept
           pièces draconides spécialisées, les six pièces nordiques en laine. La virgule, « et »
