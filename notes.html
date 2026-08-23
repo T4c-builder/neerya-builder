@@ -329,11 +329,20 @@ footer a{color:var(--bronze)}
           arrondit à 1,3 et que les relevés situent plutôt vers 1,4.
         </div>
         <div class="note good">
-          <b>Protection du Magocrate.</b> Le grimoire ne donne pas des chiffres fixes mais trois
-          formules, choisies selon la puissance élémentaire <b>boostée</b> la plus haute :
-          intelligence pure pour feu, eau et nécromancie ; sagesse pure pour terre et lumière ;
-          sagesse + intelligence pures moins 100 pour l'air. Divisée par 200, cette valeur donne
-          la puissance par pièce, par 400 la résistance ; les deux doublent à l'armure complète.
+          <b>Protection du Magocrate.</b> Le grimoire majore les <b>six</b> puissances, pas
+          seulement l'élément dominant. La valeur pilote dépend de l'élément : intelligence pure
+          pour feu, eau et nécromancie ; sagesse pure pour terre et lumière ; sagesse +
+          intelligence pures moins 100 pour l'air. Ce qui compte ensuite n'est pas cette valeur
+          mais son <b>palier</b>, sa centaine. Par pièce, armure incomplète : <b>palier ÷ 2</b>
+          pour les éléments de la caractéristique la plus haute et pour l'air,
+          <b>palier ÷ 16</b> pour ceux de la plus basse, <b>palier ÷ 4</b> pour toutes les
+          résistances. Tronqué sur le total, doublé à l'armure complète.
+          Chaque formule retranche d'abord le <b>prérequis de l'armure</b>, 80 dans la
+          caractéristique — 160 pour l'air, qui en lit deux — puis divise par <b>200</b> pour la
+          puissance et <b>400</b> pour la résistance. Les trois éléments de la caractéristique
+          la plus basse reçoivent un <b>huitième</b> de la formule de la plus haute : Elsa n'a
+          que 80 d'intelligence, le prérequis exact, et gagne pourtant en feu, eau et
+          nécromancie — plus qu'Aioras qui en a 100. Tout se tronque sur le total.
           La classe d'armure prend la somme des deux valeurs pures moins 100, divisée par 140,
           tronquée par pièce. Aucun de ces bonus n'est plafonné.
         </div>
@@ -349,10 +358,54 @@ footer a{color:var(--bronze)}
           « valeur pure ÷ constante » ne peut les rendre tous les deux : c'est l'escalier du
           palier qui fait la différence. Le diviseur 240 est d'ailleurs le seul entier possible,
           l'intervalle admissible allant de 239,92 à 240,06.
-          <b>Point ouvert :</b> les diviseurs de la puissance (200), des résistances (400) et de
-          la classe d'armure (140) ont tous été calés sur des personnages de palier 7. Ils
-          valent peut-être eux aussi « × palier ÷ (7 × constante) ». Un relevé sur un
-          personnage d'un autre palier tranchera.
+          À l'armure <b>complète</b>, la valeur pilote devient le <b>palier</b>, la centaine
+          de la caractéristique — et le tout double. Cette seconde branche redonne le tableau du
+          wiki au palier 8 : +8 puissance par pièce, +4 en résistance, +48 et +24 au total. Le
+          « dernier palier » du wiki était donc le huitième, et rien ne plafonne au-delà : Elsa,
+          palier 9, dépasse ces maxima. L'état à six pièces d'Aioras, qui l'oblige à retirer sa
+          tiare, son tissage et ses braies, redonne au point près ce que le wiki prête à ces
+          trois pièces — une confirmation qui ne doit rien au calage.
+          Les 63 relevés de puissance et de résistance des trois personnages tombent juste.
+        </div>
+        <div class="note good">
+          <b>Les 6 % d'Anwynn se tronquent.</b> Seule exception connue à l'arrondi général du
+          moteur, avec la classe d'armure. Aioras a trois paliers de renaissance en puissance
+          lumière et la récompense d'Anwynn dessus : 115 × 1,06 = 121,9, et le jeu affiche
+          <b>121</b>. L'arrondi donnait 122, soit un point de trop sur chacun de ses cinq états
+          relevés.
+        </div>
+        <div class="note good">
+          <b>La classe d'armure comptée deux fois.</b> Le wiki l'écrit parfois à deux endroits :
+          dans la colonne « CA » du tableau et de nouveau en tête du texte des bonus. Quatorze
+          objets étaient concernés — les Gantelets du sorcier avancés valaient +10 au lieu de
+          +5. La mention du texte est retirée quand elle ouvre la phrase et répète exactement la
+          valeur du tableau ; celle qui vit au milieu d'une phrase conditionnelle (« En activant
+          la Gemme Océane… +5 CA ») est un vrai bonus supplémentaire et reste.
+        </div>
+        <div class="note good">
+          <b>La résistance à la lumière ne bouge pas.</b> Les trois personnages relevés en jeu
+          affichent 5 000 tout rond dans tous leurs états, alors qu'ils portent tous des objets
+          « +N à toutes les résistances ». Le 5 000 vaut immunité, pas une valeur à majorer.
+        </div>
+        <div class="note good">
+          <b>« OU » veut dire ou.</b> « +15 force OU dextérité OU intelligence OU sagesse » ne
+          donne pas +15 aux quatre : il donne +15 à la plus haute des valeurs <b>pures</b>
+          citées. Quatorze objets étaient concernés — le Bouclier argenté prismatique, les sept
+          pièces draconides spécialisées, les six pièces nordiques en laine. La virgule, « et »
+          et la barre oblique restent, eux, cumulatifs.
+        </div>
+        <div class="note good">
+          <b>Les sorts lancés par un objet.</b> L'Anneau du berserker lance de lui-même une Rage
+          berserk (+25 % de force, +25 % en attaque, deux minutes). Ce n'est pas un bonus
+          permanent : il n'est jamais compté par défaut, mais un bouton, à côté des gemmes,
+          permet de voir le personnage pendant l'effet. Les <i>procs</i> des arcs — l'afflux de
+          mana et ses +33 % de puissances — ne sont, eux, pas comptés du tout.
+        </div>
+        <div class="note good">
+          <b>Coquilles du wiki corrigées à la source.</b> La Malice de Hvedrung glaciale annonce
+          « +10 résistance eau » là où le jeu donne « +10 résistance feu » — <i>vérifié en
+          jeu</i>. Et trois abréviations reviennent partout : « dext » pour dextérité,
+          « guerrison » pour guérison, « toutes résist » pour toutes les résistances.
         </div>
         <div class="note flag">
           <b>Effets des sorts.</b> Le wiki décrit les bonus en toutes lettres et de façons trop
