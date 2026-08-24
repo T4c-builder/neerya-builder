@@ -230,7 +230,7 @@ footer a{color:var(--bronze)}
 <header>
   <div class="hwrap">
     <h1>Neerya <span>T4c</span> Builder</h1>
-    <span class="tag">Version 6.8</span>
+    <span class="tag">Version 7.0</span>
     <div class="hspacer"></div>
     <span class="hsave">
       <select id="psel" aria-label="Mes personnages"></select>
@@ -378,7 +378,7 @@ footer a{color:var(--bronze)}
 
 <footer>
   Données extraites du <a href="https://www.t4c-neerya.com/wiki/" target="_blank" rel="noopener">wiki T4C Neerya</a>
-  — <span id="nbobj"></span> objets. <a href="notes.html">Notes de modélisation</a>.
+  — <span id="nbobj"></span> objets.
   Projet indépendant, non affilié à l'équipe du serveur.
 </footer>
 
@@ -596,6 +596,10 @@ function baseElem(type,el){
 function ringEquipe(){
   return ["anneau1","anneau2"].some(function(k){return S.eq[k]&&S.eq[k].n==="Anneau de lien";});
 }
+/* En jeu, les améliorations de l'anneau ne s'appliquent qu'une fois l'anneau activé d'un
+   double-clic, comme un talisman ou le grimoire du Magocrate. Il partage donc le mécanisme
+   des gemmes : actif par défaut, désactivable, et l'état voyage dans le lien de partage. */
+function ringActif(){ return ringEquipe() && !S.gemOff["Anneau de lien"]; }
 function sommeObj(o){var t=0;Object.keys(o).forEach(function(k){t+=o[k]||0;});return t;}
 function ringStatsUtil(){return sommeObj(S.ring.st);}
 function ringElUtil(){return sommeObj(S.ring.puis)+sommeObj(S.ring.resi);}
@@ -920,7 +924,7 @@ function cumulEquip(){
   });
 
   /* Améliorations de l'anneau de lien : bonus de statistique, donc boostés. */
-  if(ringEquipe()){
+  if(ringActif()){
     CLES.forEach(function(k){tot.stats[k]+=S.ring.st[k]||0;});
     tot.pv+=S.ring.pv||0;
     ELEMS.forEach(function(e){
@@ -1398,6 +1402,25 @@ function bonusGemmes(base,puisVal){
                   raison:"lancé par l'objet, pas un bonus permanent — "+d.desc});
   });
 
+  /* L'anneau de lien s'active comme une gemme : ses améliorations n'existent qu'allumé. */
+  if(ringEquipe()){
+    var coupeR=!!S.gemOff["Anneau de lien"], lignesR=[];
+    CLES.forEach(function(k){
+      if(S.ring.st[k]) lignesR.push("+"+S.ring.st[k]+" "+LIB[k][0].toLowerCase());
+    });
+    if(S.ring.pv) lignesR.push("+"+S.ring.pv+" points de vie");
+    ELEMS.forEach(function(e){
+      if(S.ring.puis[e]) lignesR.push("+"+S.ring.puis[e]+" puissance "+e.toLowerCase());
+      if(S.ring.resi[e]) lignesR.push("+"+S.ring.resi[e]+" résistance "+e.toLowerCase());
+    });
+    if(S.ring.comp.type&&S.ring.comp.nom)
+      lignesR.push("+"+RING_COMP[S.ring.comp.type]+" "+S.ring.comp.nom.toLowerCase());
+    r.blocs.push({nom:"Anneau de lien", type:"Bijou", set:"améliorations", n:null,
+      actif:!coupeR&&lignesR.length>0, lignes:lignesR, complet:true, coupee:coupeR,
+      raison: coupeR?"désactivé manuellement"
+                    :"aucune amélioration renseignée dans l'encart de l'anneau"});
+  }
+
   /* Orbes du Bélier : équipées, mais conditionnées par l'armure. */
   Object.keys(ORBES_SET).forEach(function(nom){
     var porte=["orbe"].some(function(sl){ return S.eq[sl] && S.eq[sl].n===nom; });
@@ -1528,7 +1551,7 @@ var bonusBenediction=0;
 function effetsCalcules(base,boost){
   var r={st:{f:0,e:0,d:0,i:0,s:0},sk:{},puisPct:{},resiPct:{},puisPlat:{},resiPlat:{},
          puisPctL:{},resiPctL:{},pvPctL:[],
-         pv:0,pvPct:0,ca:0,notes:[]};
+         pv:0,pvPct:0,pvBen:null,ca:0,notes:[]};
   function actif(n){return !!S.sactifs[n];}
 
   /* Sorts de classe d'armure. Contrairement aux pourcentages ordinaires, ces formules
@@ -1608,7 +1631,7 @@ function effetsCalcules(base,boost){
         " % de points de vie</b> à la bénédiction.");
     }
     var mini=sag+1, maxi=sag+arr(sag/4), moy=arr((mini+maxi)/2);
-    r.pv+=moy;
+    r.pv+=moy; r.pvBen={mini:mini, maxi:maxi, moy:moy};
     r.sk["Attaque"]=(r.sk["Attaque"]||0)+arr(sag/2);
     r.sk["Archerie"]=(r.sk["Archerie"]||0)+arr(sag/2);
     r.notes.push("Bénédiction donne <b>"+fmt(moy)+" points de vie</b> en moyenne (tirage entre "+
@@ -2071,14 +2094,18 @@ function render(){
     (S.anw.choix==="puis"||S.anw.choix==="resi")?"":"none";
 
   /* Anneau de lien : les améliorations ne comptent que s'il est réellement porté */
-  var porte=ringEquipe();
+  var porte=ringEquipe(), allume=ringActif();
   document.getElementById("ringform").classList.toggle("inactif",!porte);
-  document.getElementById("ringsub").textContent=porte?"porté":"non porté";
-  document.getElementById("ringetat").innerHTML = porte
+  document.getElementById("ringsub").textContent=
+    !porte?"non porté":allume?"porté et activé":"porté, désactivé";
+  document.getElementById("ringetat").innerHTML = !porte
+    ? "<b>Équipe l'anneau de lien dans un emplacement d'anneau</b> pour que ces améliorations comptent. "+
+      "Il occupe une place, comme n'importe quel autre bijou."
+    : allume
     ? "Bonus de base déjà comptés dans l'équipement : +5 à toutes les caractéristiques, "+
       "+2 à toutes les puissances, +4 à toutes les résistances."
-    : "<b>Équipe l'anneau de lien dans un emplacement d'anneau</b> pour que ces améliorations comptent. "+
-      "Il occupe une place, comme n'importe quel autre bijou.";
+    : "<b>L'anneau est porté mais éteint</b> : ses améliorations ne comptent pas. Rallume-le "+
+      "dans la liste des gemmes, sous l'équipement.";
   var rst=ringStatsUtil(), rel=ringElUtil();
   function compteur(id,val,max){
     var e=document.getElementById(id);
@@ -2199,12 +2226,25 @@ function render(){
      C'est sur eux, et sur eux seuls, que portent les pourcentages de points de vie — même
      règle que pour les caractéristiques. Les gains plats de l'équipement et des sorts
      s'ajoutent ensuite, sans être majorés à leur tour. */
+  /* Trois apports, de natures différentes, qu'il vaut mieux lire séparément :
+       — les PV PURS, ceux du socle, des niveaux et de l'endurance, majorés des pourcentages
+         et des gains plats d'équipement. Leur propre tirage par niveau est déjà moyenné : le
+         détailler ici noierait le reste, on n'en donne que la moyenne.
+       — l'anneau de lien, un nombre fixe que le joueur choisit lui-même.
+       — la bénédiction, seul apport dont la fourchette se joue à chaque lancer.
+     Le total s'affiche donc « bas / haut » : la vraie marge de manœuvre du personnage, une
+     fois ses PV purs figés. */
   var hpPur=PV_BASE+kE;
   function pvT(g){ var pur=hpPur+g*n;
                    return pur+sommePct(pur,eq.pvPctL,calc.pvPctL)+eq.pv+calc.pv; }
-  document.getElementById("hp").textContent=fmt(pvT(7));
-  document.getElementById("hpr").textContent=
-    fmt(pvT(6))+" – "+fmt(pvT(8))+" selon les tirages";
+  var pvRing=ringActif()?(S.ring.pv||0):0, ben=calc.pvBen;
+  var pvPur=pvT(7)-pvRing-(ben?ben.moy:0);
+  var bas=pvPur+pvRing+(ben?ben.mini:0), haut=pvPur+pvRing+(ben?ben.maxi:0);
+  document.getElementById("hp").textContent = ben ? fmt(bas)+" / "+fmt(haut) : fmt(bas);
+  var detPV=["PV purs "+fmt(pvPur)];
+  if(pvRing) detPV.push("Anneau de lien +"+fmt(pvRing));
+  if(ben) detPV.push("Bénédiction "+fmt(ben.mini)+" – "+fmt(ben.maxi));
+  document.getElementById("hpr").innerHTML=detPV.join("<br>");
 
   var pmFixe=PM_BASE+eq.pm+kI+kS, pmMoy=pmFixe+4*n;
   document.getElementById("mp").textContent=fmt(pmMoy);
