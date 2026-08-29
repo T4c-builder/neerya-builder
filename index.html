@@ -233,7 +233,7 @@ footer a{color:var(--bronze)}
 <header>
   <div class="hwrap">
     <h1>Neerya <span>T4c</span> Builder</h1>
-    <span class="tag">Version 7.4</span>
+    <span class="tag">Version 8.0</span>
     <div class="hspacer"></div>
     <span class="hsave">
       <select id="psel" aria-label="Mes personnages"></select>
@@ -1249,107 +1249,114 @@ function bonusGemmes(base,puisVal){
       }
       else if(s.calc==="magocrate"){
         /* Protection du Magocrate, activée par le grimoire. Aucun de ses bonus n'est un
-           chiffre fixe : tous se calculent sur l'intelligence et la sagesse PURES.
+           chiffre fixe : tout se calcule sur l'intelligence et la sagesse PURES, et tout passe
+           par des PALIERS — la centaine d'une valeur.
 
-           CA : la somme des deux valeurs pures moins 100, divisée par 140, sans doublement.
-           Contrairement aux autres bonus, la troncature se fait PAR PIÈCE : en jeu chaque
-           pièce ajoute un nombre entier de CA, identique d'une pièce à l'autre. Calé sur
-           trois personnages relevés en jeu — 757/100, 716/85 et 721/85 — qui donnent tous
-           +5 CA par pièce. Le diviseur reste approximatif : toute valeur entre 127 et 140
-           rendrait ces trois relevés.
+               palier haut  = partie entière de (la plus haute des deux) / 100
+               palier paire = partie entière de (sagesse + intelligence − 100) / 100,
+                              jamais inférieur à 1
 
-           Réserve : les trois personnages du calage sont tous au palier de paire 7, et depuis
-           on sait que puissances et résistances sont pilotées par le PALIER et non par la
-           valeur brute. La CA suit peut-être la même règle — « palier paire × 100 / 140 »
-           donne aussi 5 pour ces trois-là. Les deux écritures ne divergent qu'à un autre
-           palier, et aucune CA n'y a encore été relevée : on garde la valeur brute faute de
-           preuve. */
-        var srcCA=Math.max(0,base.s+base.i-100), caPiece=arr(srcCA/140), gCA=caPiece*n;
-        r.ca+=gCA;
-        /* Puissances et résistances. Le grimoire ne majore pas un seul élément mais les six.
-           Deux paliers pilotent l'ensemble — le palier étant la centaine d'une valeur PURE :
+           Le palier haut n'a pas de minimum : un personnage sous 100 dans sa caractéristique
+           dominante ne gagne aucune puissance élémentaire (relevé sur un 80/80). Le palier de
+           la paire en a un : le même personnage gagne quand même en air, en résistances et en
+           classe d'armure.
 
-             palier HAUT   = centaine de la plus haute de sagesse / intelligence
-             palier PAIRE  = centaine de (sagesse + intelligence − 100)
+           Deux régimes bien distincts, et ce ne sont pas deux écritures du même calcul :
 
-           Tout se déduit ensuite d'une seule valeur par pièce, le palier divisé par deux :
+             ARMURE INCOMPLÈTE (1 à 5 pièces)   tronqué(n × valeur par pièce)
+             ARMURE COMPLÈTE (6 pièces)          formule propre, entière, sans troncature
 
-             puissances dominantes (les deux éléments de la caractéristique haute)
-                                                    palier haut  / 2
-             puissances faibles (les trois opposés)  palier haut  / 16
-             puissance air                           palier paire / 2
-             résistances (les cinq)                  palier paire / 4
+           Tout se tronque sur le TOTAL, jamais pièce par pièce.
 
-           Tronqué sur le TOTAL, jamais par pièce, et doublé à l'armure complète — ce qui donne
-           alors des entiers exacts : 6 × palier en puissance dominante et en air, 3 × palier
-           en résistance.
+           ── Éléments ─────────────────────────────────────────────────────────────
+                                          incomplète            complète
+             puissances dominantes        palier haut  / 2      6 × palier haut
+             puissances faibles           palier haut  / 16     tronqué(3 × palier haut / 4)
+             puissance air                palier paire / 2      6 × palier paire
+             résistances (les cinq)       palier paire / 4      3 × palier paire
 
-           Ce sont bien les PALIERS qui pilotent, pas les valeurs brutes : entre 899 et 900 de
-           sagesse — un seul point — la puissance terre passe de 4 à 4,5 par pièce. Aucune
-           fonction de la valeur brute ne produit ce saut.
+           Les dominantes sont les deux éléments de la caractéristique la plus haute — terre et
+           lumière pour la sagesse, feu, eau et nécromancie pour l'intelligence. La résistance à
+           la lumière ne bouge jamais (immunité à 5000).
 
-           L'attribution des deux paliers est démontrée par Enolia (596 sagesse / 220
-           intelligence), seule à les avoir différents avec une série complète : palier haut 5,
-           palier paire 7. Ses puissances faibles suivent le 5, son air et ses résistances le 7.
+           L'ANOMALIE DU PALIER 7. Le régime incomplet se lit mieux comme un PRORATA de la
+           valeur du set : chaque pièce vaut un douzième de « 6 × palier », soit palier / 2. Et
+           c'est cette table de set qui porte l'anomalie — son entrée du palier 7 vaut 41 au
+           lieu de 42. Deux pièces donnent alors +6 et non +7, quatre pièces +13 et non +14,
+           et les résistances décrochent à 4 pièces seulement : 41/12, 41/24 et 41/96 rendent
+           les trois signatures observées. Le régime complet ne lit pas cette table et rend
+           bien 6 × 7 = 42.
 
-           Calage : 166 relevés sur six personnages — Aioras (757/100), Elsa (981/80), un mage
-           eau (85/721, le seul à intelligence dominante, qui vérifie que les deux familles
-           d'éléments échangent leurs rôles), Niluje à 899 puis 900 de sagesse (174
-           intelligence) et Enolia. */
+           Aucune expression uniforme en palier ne peut produire ce creux : il faudrait un
+           rapport à la fois supérieur ou égal à 1/2 (le palier 8 rend exactement 4n) et
+           strictement inférieur à 1/2 (le palier 7 rend 6 à deux pièces). Un facteur global,
+           7/12 ou autre, est donc exclu — seule une table indexée par palier l'explique.
+           Vérifié sur six personnages indépendants, deux classes, et sur les deux paliers ;
+           les paliers 1, 2, 3, 4, 6, 8, 9 et 10 sont propres, le 6 comme le 8.
+
+           ── Caractéristiques ─────────────────────────────────────────────────────
+           Elles gardent la valeur pure en facteur — c'est « valeur × palier », pas le palier
+           seul — et le plus haut de deux termes :
+
+             la plus haute : valeur × palier haut / 240      jamais moins de n / 4
+             la plus basse : valeur × palier haut / 384      jamais moins de n / 4
+
+           multiplié par 1,5 à l'armure complète (là où les éléments doublent). Le plancher de
+           n/4 est ce qui fait qu'un personnage à 80/80, sans palier haut, gagne quand même
+           +1 à quatre pièces et +2 au set complet. Les deux caractéristiques utilisent le
+           palier HAUT, y compris la plus basse.
+
+           Le diviseur 240 est certain (l'intervalle admissible va de 239,90 à 240,06). Celui de
+           la plus basse est encadré entre 381 et 389 ; 384 = 240 × 8/5 est la valeur de travail.
+
+           ── Classe d'armure ──────────────────────────────────────────────────────
+           Elle ne dépend QUE du palier de la paire, plafonné à 6 :
+
+             par pièce = palier plafonné × 5/6
+             incomplète : tronqué(n × par pièce)     complète : tronqué(8 × par pièce)
+
+           Le plafond explique le maximum de 40 observé en jeu : au palier 6 et au-delà, chaque
+           pièce vaut 5 et le set entier 40. Le set multiplie par 8/6, là où la puissance double
+           et la caractéristique augmente de moitié.
+
+           ── Calage ───────────────────────────────────────────────────────────────
+           1 374 relevés, 35 personnages, deux campagnes indépendantes — celle de Bertrand
+           (valeurs brutes) et celle de Theoran (bonus seuls, dont un balayage de la sagesse de
+           80 à 900 qui donne les paliers 1 à 10). Le modèle en rend 1 323, soit 96,3 %. Les
+           écarts sont documentés dans magocrate-modele.md ; treize séries de relevés sont
+           arithmétiquement impossibles en elles-mêmes et contiennent donc au moins une erreur
+           de saisie. */
+        var vH=Math.max(base.s,base.i), vB=Math.min(base.s,base.i);
         var haute=base.s>base.i?"s":"i", basse=haute==="i"?"s":"i";
-        var vh=base[haute], vb=base[basse];
-        var palH=Math.max(0,Math.floor(vh/100));
-        var palP=Math.max(0,Math.floor((base.s+base.i-100)/100));
-        /* L'anomalie du palier 7. En armure INCOMPLÈTE, et à ce palier seulement, le jeu rend
-           systématiquement un point de moins que « palier / 2 » partout où le produit tombe sur
-           un entier : deux pièces donnent +6 et non +7, quatre pièces +13 et non +14. Constaté
-           sur trois personnages indépendants (Aioras, Amélia, Enolia), deux classes et les deux
-           paliers — et la signature suit le diviseur, ce qui exclut l'erreur de relevé :
-           l'écart apparaît à 2 et 4 pièces sur les puissances (divisées par 2), à 4 pièces
-           seulement sur les résistances (divisées par 4), et jamais sur les puissances faibles
-           (divisées par 16) — exactement là où la troncature peut basculer.
-
-           Tout se passe comme si l'entrée « palier 7 » d'une table de coefficients valait 6,9
-           au lieu de 7. Les paliers 5, 8 et 9 sont propres, l'armure complète l'est aussi — au
-           palier 7 elle rend bien 42 et 21. À confirmer sur un palier 6 ou 10 : si eux sont
-           propres, le 7 est une singularité isolée ; sinon la table est à relever entrée par
-           entrée. */
-        function coefPalier(p){ return p===7?6.9:p; }
-        var cH=e.complet?palH:coefPalier(palH),
-            cP=e.complet?palP:coefPalier(palP),
-            mult=e.complet?2:1;
-        var parEl={"Air":cP/2};
-        ["Terre","Lumière"].forEach(function(x){ parEl[x]=haute==="s"?cH/2:cH/16; });
-        ["Feu","Eau","Nécromancie"].forEach(function(x){ parEl[x]=haute==="i"?cH/2:cH/16; });
+        var palH=Math.max(0,Math.floor(vH/100));
+        var palP=Math.max(1,Math.floor((base.s+base.i-100)/100));
+        /* L'armure incomplète prorate la valeur du SET par n/12 ; l'armure complète calcule
+           directement. C'est cette table de set qui porte l'anomalie : son entrée du palier 7
+           vaut 41 au lieu de 42, et 41/12 = 3,4167 par pièce reproduit exactement les relevés.
+           Le régime complet, lui, ne lit pas la table et rend bien 6 × 7 = 42. */
+        function setDe(p){ return p===7?41:6*p; }
+        var cplt=e.complet, m15=cplt?1.5:1;
+        var tH=setDe(palH), tP=setDe(palP);
+        var parEl={"Air":tP/12};
+        ["Terre","Lumière"].forEach(function(x){ parEl[x]=haute==="s"?tH/12:tH/96; });
+        ["Feu","Eau","Nécromancie"].forEach(function(x){ parEl[x]=haute==="i"?tH/12:tH/96; });
         var gPuis={};
-        ELEMS.forEach(function(x){ gPuis[x]=Math.trunc(n*mult*parEl[x]); pui(x,gPuis[x]); });
-        var gRes=Math.trunc(n*mult*cP/4);
+        ELEMS.forEach(function(x){
+          var dom = (x==="Air") ? null : ((haute==="s")===(x==="Terre"||x==="Lumière"));
+          gPuis[x] = cplt
+            ? (x==="Air" ? 6*palP : (dom ? 6*palH : Math.trunc(3*palH/4)))
+            : Math.trunc(n*parEl[x]);
+          pui(x,gPuis[x]);
+        });
+        var gRes=cplt?3*palP:Math.trunc(n*tP/24);
         tousRes(gRes);
-        /* Bonus de caractéristique. Contrairement aux éléments, ils gardent la valeur PURE en
-           facteur — c'est « valeur × palier », pas le palier seul :
-
-               plus haute : valeur pure × palier haut / 240
-               plus basse : valeur pure × palier haut / 384
-
-           tronqué sur le TOTAL, et majoré de moitié à l'armure complète (× 1,5 — là où la
-           puissance et les résistances doublent). Les deux utilisent le palier HAUT, y compris
-           la plus basse : Enolia le prouve, sa basse suit son palier 5 et non le 7 de sa paire.
-           À égalité entre sagesse et intelligence, l'intelligence tient le rôle de la plus
-           haute — arbitraire, jamais vérifié en jeu.
-
-           Écriture équivalente, plus parlante : chaque pièce vaut un sixième de
-           « palier × valeur / 40 » pour la haute et de « palier × valeur / 64 » pour la basse,
-           et l'armure complète vaut une fois et demie ce bonus de référence.
-
-           Les diviseurs : 240 est certain, les relevés l'enferment entre 239,90 et 240,06.
-           384 = 240 × 8/5 est la meilleure estimation pour la plus basse, dont l'intervalle
-           admissible va de 381,2 à 388,9 — le 400 d'abord retenu est réfuté par Niluje, dont
-           les 174 d'intelligence sont la première basse assez grande pour que la fraction se
-           voie. L'écart entre 381 et 389 ne change aucun résultat sur les six personnages
-           mesurés. */
-        var m15=e.complet?1.5:1;
-        var gH=Math.trunc(n*m15*vh*palH/240), gB=Math.trunc(n*m15*vb*palH/384);
+        /* Caractéristiques */
+        var gH=Math.trunc(Math.max(n*m15*vH*palH/240, n*m15/4)),
+            gB=Math.trunc(Math.max(n*m15*vB*palH/384, n*m15/4));
         stat(haute,gH); stat(basse,gB);
+        /* Classe d'armure */
+        var caPiece=Math.min(6,palP)*5/6, gCA=Math.trunc((cplt?8:n)*caPiece);
+        r.ca+=gCA;
         sk("Méditation",10);
         /* Une ligne à +0 n'apprend rien : on ne l'affiche pas. */
         if(gCA) lignes.push("+"+gCA+" CA");
