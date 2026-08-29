@@ -195,6 +195,11 @@ input:focus-visible,select:focus-visible{outline:2px solid var(--bronze);outline
 .opts label{display:flex;gap:9px;align-items:flex-start;cursor:pointer}
 .opts input[type=checkbox]{margin-top:4px;accent-color:var(--bronze)}
 .opts small{display:block;color:var(--ink-faint);font-size:12.5px}
+/* Case à cocher et champ de recherche partagent une ligne, et repassent l'un sous l'autre
+   quand la colonne devient étroite. */
+.filtrerow{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.filtrerow .opts{flex:0 1 auto}
+.filtrerow input[type=search]{flex:1 1 190px;width:auto;min-width:150px}
 
 .vitals{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .vital{border:1px solid var(--line-soft);border-radius:2px;padding:12px 14px;background:var(--panel-2)}
@@ -233,7 +238,7 @@ footer a{color:var(--bronze)}
 <header>
   <div class="hwrap">
     <h1>Neerya <span>T4c</span> Builder</h1>
-    <span class="tag">Version 8.0</span>
+    <span class="tag">Version 8.1</span>
     <div class="hspacer"></div>
     <span class="hsave">
       <select id="psel" aria-label="Mes personnages"></select>
@@ -329,11 +334,15 @@ footer a{color:var(--bronze)}
       <div class="pbody">
         <div class="note" id="snote"></div>
         <div class="note good" id="sfx"></div>
-        <label class="opts" style="font-size:14px"><span style="display:flex;gap:9px;align-items:center">
-          <input type="checkbox" id="sall"> Afficher aussi les sorts hors de portée</span></label>
+        <div class="filtrerow">
+          <label class="opts" style="font-size:14px"><span style="display:flex;gap:9px;align-items:center">
+            <input type="checkbox" id="sall"> Afficher aussi les sorts hors de portée</span></label>
+          <input type="search" id="sq" placeholder="Chercher un sort par son nom…" aria-label="Chercher un sort">
+        </div>
         <div class="alerte" id="salerte" role="status"></div>
         <div class="sortrow entete"><span>Appris</span><span>Lancé</span><span>Sort</span><span>Élément</span></div>
-        <div class="scroll" style="max-height:560px;overflow:auto"><div id="sortslist"></div></div>
+        <div class="scroll" style="max-height:560px;overflow:auto"><div id="sortslist"></div>
+          <div class="empty" id="svide" hidden>Aucun sort ne porte ce nom.</div></div>
       </div>
     </section>
 
@@ -486,6 +495,11 @@ var BASIQUES=["Attaque","Archerie","Esquive"];
 var SPECIALISEES=["Coup assommant","Coup puissant","Parade","Guérison rapide","Transpercer l'armure",
   "Chercher","Coup d'oeil","Crochetage de serrures","Dissimulation","Méditation","Premiers soins",
   "Ramener à la vie","Se faufiler","Voler","Piller"];
+/* Le +15 de l'anneau de lien ne s'applique PAS à toutes les compétences spécialisées :
+   le jeu n'en propose que ces huit — *relevé en jeu par Bertrand*. Transpercer l'armure a
+   son propre choix, à +60, et reste exclu d'ici. */
+var SPEC_ANNEAU=["Coup puissant","Parade","Guérison rapide","Méditation","Premiers soins",
+  "Dissimulation","Voler","Crochetage de serrures"];
 var MAX_RING_STATS=50, MAX_RING_PV=400, MAX_RING_EL=20;
 
 /* Puissances et résistances : 100 de base partout, sauf la résistance à la lumière.
@@ -496,8 +510,13 @@ var SOCLE_EL=100, SOCLE_RES_LUMIERE=5000;
 var CHANCE_BASE=100;
 /* Points de renaissance accordés : aucun en humain, 10 en X1, 12 en X2. */
 var PTS_REN=[0,10,12];
-/* Une résistance coûte 1 point par palier de +5. Une puissance coûte de plus en plus
-   cher : le n-ième palier de +5 coûte n points, soit n(n+1)/2 au total. */
+/* Le compteur interne reste en paliers de +5 pour les deux — c'est lui qui voyage dans les
+   liens de partage. Mais en jeu une RÉSISTANCE ne se monte et ne se descend que par tranches
+   de +10, au prix de 2 points de renaissance : les boutons avancent donc de deux paliers à
+   la fois (`PAS_RESI`). Le tarif, lui, ne change pas — 1 point par palier de +5, soit bien
+   2 points pour +10. Une puissance coûte de plus en plus cher : le n-ième palier de +5 coûte
+   n points, soit n(n+1)/2 au total, et se monte palier par palier. */
+var PAS_RESI=2;
 function coutResi(n){return n;}
 function coutPuis(n){return n*(n+1)/2;}
 /* Le wiki se contredit : la page des bijoux annonce 60, le guide du débutant 75.
@@ -513,7 +532,7 @@ var ANWYNN=[
  {k:"resi", l:"6 % de résistance élémentaire",  d:"Dans l'élément de ton choix."}
 ];
 
-var S={niveau:1,ren:0,ebon:false,pts:{},eq:{},showall:false,skall:false,q:"",
+var S={niveau:1,ren:0,ebon:false,pts:{},eq:{},showall:false,skall:false,q:"",sq:"",
        comp:{},
        anw:{choix:"",el:"Feu"},
        rp:{puis:{},resi:{}}, sappris:{}, sactifs:{}, sall:false,
@@ -1703,11 +1722,15 @@ var elSal=document.getElementById("salerte");
 function salerte(m){ elSal.textContent=m||""; elSal.classList.toggle("on",!!m); }
 
 function majSorts(base,fxNotes){
+  /* Pendant une recherche, la case « hors de portée » est ignorée : on cherche justement un
+     sort qu'on ne peut pas encore apprendre, pour en lire les prérequis. */
+  var q=sansAcc(S.sq.trim()), trouves=0;
   SORTS.forEach(function(s){
     var ligne=elSorts.querySelector('[data-sort="'+CSS.escape(s.n)+'"]');
     var blocage=sortAccessible(s,base);
     var appris=!!S.sappris[s.n];
-    var montre=S.sall||!blocage||appris;
+    var montre = q ? sansAcc(s.n).indexOf(q)>=0 : (S.sall||!blocage||appris);
+    if(montre) trouves++;
     ligne.style.display=montre?"":"none";
     var a=ligne.querySelector("[data-sappr]"), c=ligne.querySelector("[data-sact]");
     a.checked=appris; a.disabled=!!blocage&&!appris;
@@ -1715,9 +1738,12 @@ function majSorts(base,fxNotes){
     ligne.classList.toggle("actif",!!S.sactifs[s.n]);
     ligne.querySelector(".bloque").textContent=(blocage&&!appris)?blocage:"";
   });
+  document.getElementById("svide").hidden = !(q && !trouves);
   var nb=Object.keys(S.sappris).filter(function(n){return S.sappris[n];}).length;
   var act=Object.keys(S.sactifs).filter(function(n){return S.sactifs[n];}).length;
-  document.getElementById("ssub").textContent=nb+" appris · "+act+" lancés";
+  document.getElementById("ssub").textContent = q
+    ? trouves+" sort"+(trouves>1?"s":"")+" trouvé"+(trouves>1?"s":"")
+    : nb+" appris · "+act+" lancés";
   document.getElementById("sfx").innerHTML=fxNotes.length
     ? "<b>Effets calculés en cours :</b><br>"+fxNotes.join("<br>") : "";
   document.getElementById("snote").innerHTML=
@@ -1759,25 +1785,31 @@ elSorts.addEventListener("change",function(e){
 document.getElementById("sall").addEventListener("change",function(e){
   S.sall=e.target.checked; render();
 });
+document.getElementById("sq").addEventListener("input",function(e){
+  S.sq=e.target.value; render();
+});
 
 /* ---------- points de renaissance ---------- */
 (function(){
   function bloc(type,titre,legende){
+    /* Le pas d'un clic : deux paliers de +5 pour une résistance, un seul pour une puissance. */
+    var pas=type==="resi"?PAS_RESI:1, cran="+"+(5*pas);
     return '<div class="bloc"><div class="sub2"><span>'+titre+'</span>'+
       '<b id="rp-'+type+'">0 pt</b></div>'+
       '<div class="gmini">'+ELEMS.map(function(e){
         return '<div class="mini"><span title="'+e+'">'+e+'</span>'+
           '<div class="step">'+
-            '<button class="pm" type="button" data-rp="'+type+'" data-el="'+e+'" data-d="-1" aria-label="Retirer un palier de '+titre+' '+e+'">−</button>'+
+            '<button class="pm" type="button" data-rp="'+type+'" data-el="'+e+'" data-d="'+(-pas)+'" aria-label="Retirer '+cran+' de '+titre+' '+e+'">−</button>'+
             '<b data-rpv="'+type+'|'+e+'">+0</b>'+
-            '<button class="pm" type="button" data-rp="'+type+'" data-el="'+e+'" data-d="1" aria-label="Ajouter un palier de '+titre+' '+e+'">+</button>'+
+            '<button class="pm" type="button" data-rp="'+type+'" data-el="'+e+'" data-d="'+pas+'" aria-label="Ajouter '+cran+' de '+titre+' '+e+'">+</button>'+
           '</div>'+
           '<small data-rpc="'+type+'|'+e+'"></small></div>';
       }).join("")+'</div>'+
       '<div class="note">'+legende+'</div></div>';
   }
   document.getElementById("rpform").innerHTML=
-    bloc("resi","Résistances","1 point de renaissance par palier de +5.")+
+    bloc("resi","Résistances","Les résistances se montent et se descendent par tranches de "+
+         "<b>+10</b>, au prix de <b>2 points</b> de renaissance.")+
     bloc("puis","Puissances","Coût progressif : +5 coûte 1 point, +10 en coûte 3, +15 en coûte 6, +20 en coûte 10. Le compteur est propre à chaque élément.");
 })();
 
@@ -1805,7 +1837,9 @@ function majPtsRen(){
   document.querySelectorAll("[data-rp]").forEach(function(b){
     var ty=b.dataset.rp, e=b.dataset.el, d=+b.dataset.d, n=S.rp[ty][e]||0;
     if(d<0) b.disabled = n<=0;
-    else b.disabled = (ty==="puis"?(n+1):1) > reste;
+    /* Coût du prochain cran : n+1 pour une puissance (tarif progressif), PAS_RESI pour une
+       résistance, qui achète ses deux paliers d'un coup. */
+    else b.disabled = (ty==="puis" ? (n+1) : PAS_RESI) > reste;
   });
 }
 
@@ -1909,8 +1943,7 @@ function majCompetences(base,eq,fx,calc){
 function majCompSelect(){
   var sel=document.getElementById("rcompnom"), ty=S.ring.comp.type, garde=S.ring.comp.nom;
   if(ty==="base"||ty==="spec"){
-    var liste = ty==="base" ? BASIQUES
-              : SPECIALISEES.filter(function(n){return n!=="Transpercer l\'armure";});
+    var liste = ty==="base" ? BASIQUES : SPEC_ANNEAU;
     sel.innerHTML=liste.map(function(n){return '<option>'+n+'</option>';}).join("");
     sel.style.display="";
     sel.value = liste.indexOf(garde)>=0 ? garde : liste[0];
@@ -2672,14 +2705,30 @@ function appliquerEtat(o){
   CLES.forEach(function(k,i){ S.pts[k]=Math.max(0,(o.p&&+o.p[i])||0); });
 
   S.anw={choix:(o.aw&&o.aw[0])||"", el:(o.aw&&o.aw[1])||"Feu"};
+  /* Les résistances de renaissance ne se montent que par tranches de +10. Les sauvegardes
+     et les liens créés avant cette règle peuvent porter un nombre IMPAIR de paliers de +5,
+     soit une valeur inatteignable en jeu (+15, +25…). On la ramène au cran inférieur et on
+     le dit : le point libéré retourne au réservoir, rien ne disparaît en silence. */
+  var impairs=[];
   ELEMS.forEach(function(e){
     S.rp.puis[e]=((o.rp&&o.rp.p&&+o.rp.p[e])||0);
-    S.rp.resi[e]=((o.rp&&o.rp.r&&+o.rp.r[e])||0);
+    var r=((o.rp&&o.rp.r&&+o.rp.r[e])||0);
+    if(r%PAS_RESI){ impairs.push(e.toLowerCase()); r-=r%PAS_RESI; }
+    S.rp.resi[e]=r;
   });
+  if(impairs.length) soucis.push("résistance"+(impairs.length>1?"s":"")+" de renaissance "+
+    "ramenée"+(impairs.length>1?"s":"")+" au palier de +10 le plus proche ("+
+    impairs.join(", ")+") : le jeu ne permet pas de valeur intermédiaire");
 
   var rg=o.rg||{};
   S.ring={st:{f:0,e:0,d:0,i:0,s:0}, pv:+rg.pv||0, puis:{}, resi:{},
           comp:{type:(rg.c&&rg.c[0])||"", nom:(rg.c&&rg.c[1])||""}};
+  /* Le +15 de l'anneau ne vise que huit compétences. Une sauvegarde antérieure peut en
+     nommer une autre : majCompSelect la remplacera par la première de la liste, autant le
+     dire plutôt que de laisser croire au bonus enregistré. */
+  if(S.ring.comp.type==="spec" && SPEC_ANNEAU.indexOf(S.ring.comp.nom)<0)
+    soucis.push("« "+S.ring.comp.nom+" » ne fait pas partie des compétences que l'anneau de "+
+                "lien peut majorer de +15 : le choix a été ramené sur "+SPEC_ANNEAU[0]);
   CLES.forEach(function(k){ S.ring.st[k]=(rg.s&&+rg.s[k])||0; });
   ELEMS.forEach(function(e){
     S.ring.puis[e]=(rg.p&&+rg.p[e])||0;
