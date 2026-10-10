@@ -1252,15 +1252,15 @@ function bonusLaine(r,base){
     var k=c[0], v=base[k], paliers=(v>=LAINE_S1?1:0)+(v>=LAINE_S2?1:0);
     if(paliers){
       r.stats[k]+=t.pal*paliers;
-      L.push("+"+(t.pal*paliers)+" "+c[1]+" ("+(paliers===2?"paliers "+LAINE_S1+" et "+LAINE_S2
-             :"palier "+LAINE_S1)+" "+c[2]+")");
+      L.push("+"+(t.pal*paliers)+" "+c[1]);
     }
     if(v>=LAINE_S2){ pui(c[4]); L.push("+"+t.puis+" puissance "+c[3]); }
   });
   if(base.s>=LAINE_S1 && base.i>=LAINE_S1){ pui(["Air"]); L.push("+"+t.puis+" puissance air"); }
-  /* Seuls les bonus ACQUIS sont listés ici ; ce qu'un palier supérieur donnerait se lit
-     dans la description de chaque pièce, sous son emplacement. */
-  L.push("+"+t.proc+" % "+LAINE_PROC+" (non calculé)");
+  /* Seuls les bonus ACQUIS sont listés ici, tels qu'ils s'ajoutent, sans rappel du palier
+     qui les donne ; la règle se lit dans la description de chaque pièce, sous son
+     emplacement. Le pourcentage de déclenchement est affiché mais n'entre dans aucun calcul. */
+  L.push("+"+t.proc+" % "+LAINE_PROC);
   return {nom:"Armure nordique en laine", type:"Armure",
           set:t.n+" pièce"+(t.n>1?"s":"")+" · bonus à paliers", n:null, actif:true,
           lignes:L, complet:true, raison:null, fixe:true};
