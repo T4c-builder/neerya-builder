@@ -233,7 +233,7 @@ footer a{color:var(--bronze)}
 <header>
   <div class="hwrap">
     <h1>Neerya <span>T4c</span> Builder</h1>
-    <span class="tag">Version 8.2</span>
+    <span class="tag">Version 8.3</span>
     <div class="hspacer"></div>
     <span class="hsave">
       <select id="psel" aria-label="Mes personnages"></select>
@@ -1178,6 +1178,94 @@ var OBJETS_CONDITIONNELS={
   }
 };
 
+/* ---------- Armure nordique en laine ----------
+   Le wiki écrit « +30 Intelligence ou sagesse » et « +20 puissances basé la stat la plus
+   élevé entre int et sag » : ni l'un ni l'autre ne décrit ce que fait le jeu. Règle relevée
+   en jeu par Bertrand, sur le torse, et étendue aux cinq autres pièces qui portent la même
+   tournure avec d'autres nombres :
+
+     · sagesse PURE ≥ 150 : la moitié du bonus de sagesse ; ≥ 300 : l'autre moitié en plus ;
+     · intelligence PURE : même chose, indépendamment — les deux se cumulent ;
+     · sagesse ≥ 300 : puissance terre et lumière ;
+       intelligence ≥ 300 : puissance feu, eau et nécromancie ;
+       sagesse ≥ 150 ET intelligence ≥ 150 : puissance air ;
+     · les seuils sont atteints à 150 et 300 pile, et lus sur la valeur pure, en blanc,
+       comme tous les autres seuils du builder ;
+     · le pourcentage de déclenchement du pouvoir caché des flèches élémentaires reste du
+       texte : le builder ne calcule pas les procs.
+
+   Tout est écrit ici à la main, y compris la force, la dextérité et les résistances : ces
+   six objets ne passent plus par l'analyseur, pour qu'une réécriture du wiki ne puisse pas
+   faire compter un bonus deux fois. verif-nordique-laine.js signale si leur texte change.
+   pal = bonus de caractéristique PAR PALIER (le wiki en donne le total : 30 ou 10). */
+var LAINE={
+  "Bandeau nordique en laine":  {slot:"tete",    f:0,d:25,res:5,pal:15,puis:20,proc:4},
+  "Torse nordique en laine":    {slot:"torse",   f:0,d:25,res:5,pal:15,puis:20,proc:4},
+  "Braies nordiques en laine":  {slot:"jambes",  f:5,d:10,res:5,pal:5, puis:3, proc:2},
+  "Baudrier nordique en laine": {slot:"ceinture",f:5,d:20,res:0,pal:5, puis:3, proc:1},
+  "Bottines nordiques en laine":{slot:"pieds",   f:5,d:10,res:5,pal:5, puis:2, proc:1},
+  "Moufles nordiques en laine": {slot:"mains",   f:5,d:10,res:5,pal:5, puis:2, proc:1}
+};
+var LAINE_S1=150, LAINE_S2=300;
+var LAINE_PROC="de déclenchement du pouvoir caché des flèches élémentaires";
+function descLaine(p){
+  var L=[];
+  if(p.f) L.push("+"+p.f+" force");
+  L.push("+"+p.d+" dextérité");
+  if(p.res) L.push("+"+p.res+" à toutes les résistances");
+  L.push("+"+p.pal+" sagesse à "+LAINE_S1+" de sagesse pure, et +"+p.pal+" de plus à "+LAINE_S2);
+  L.push("+"+p.pal+" intelligence à "+LAINE_S1+" d'intelligence pure, et +"+p.pal+
+         " de plus à "+LAINE_S2);
+  L.push("+"+p.puis+" puissance terre et lumière à "+LAINE_S2+" de sagesse pure");
+  L.push("+"+p.puis+" puissance feu, eau et nécromancie à "+LAINE_S2+" d'intelligence pure");
+  L.push("+"+p.puis+" puissance air à "+LAINE_S1+" de sagesse et d'intelligence pures");
+  return L.join(" · ")+' · <span class="brut">+'+p.proc+" % "+LAINE_PROC+"</span>";
+}
+/* Les six pièces rejoignent les objets conditionnels : cumulEquip les laisse de côté, leur
+   description est celle ci-dessus, et les audits de texte les ignorent. `groupe` les écarte
+   de la boucle « un bloc par objet » — bonusLaine les additionne dans un bloc unique. */
+Object.keys(LAINE).forEach(function(nom){
+  OBJETS_CONDITIONNELS[nom]={slots:[LAINE[nom].slot], groupe:"laine", desc:descLaine(LAINE[nom])};
+});
+function bonusLaine(r,base){
+  var t={n:0,f:0,d:0,res:0,pal:0,puis:0,proc:0};
+  Object.keys(LAINE).forEach(function(nom){
+    var p=LAINE[nom], o=S.eq[p.slot];
+    if(!o||o.n!==nom) return;
+    t.n++; ["f","d","res","pal","puis","proc"].forEach(function(k){ t[k]+=p[k]; });
+  });
+  if(!t.n) return null;
+  var L=[];
+  function pui(els){ els.forEach(function(e){ r.puis[e]=(r.puis[e]||0)+t.puis; }); }
+  r.stats.f+=t.f; r.stats.d+=t.d;
+  if(t.f) L.push("+"+t.f+" force");
+  L.push("+"+t.d+" dextérité");
+  if(t.res){
+    ELEMS.forEach(function(e){ r.resi[e]=(r.resi[e]||0)+t.res; });
+    L.push("+"+t.res+" à toutes les résistances");
+  }
+  /* Deux paliers par caractéristique, chacun vaut t.pal ; sagesse et intelligence sont
+     jugées séparément, sur la valeur pure. */
+  [["s","sagesse","de sagesse pure","terre et lumière",["Terre","Lumière"]],
+   ["i","intelligence","d'intelligence pure","feu, eau et nécromancie",["Feu","Eau","Nécromancie"]]
+  ].forEach(function(c){
+    var k=c[0], v=base[k], paliers=(v>=LAINE_S1?1:0)+(v>=LAINE_S2?1:0);
+    if(paliers){
+      r.stats[k]+=t.pal*paliers;
+      L.push("+"+(t.pal*paliers)+" "+c[1]+" ("+(paliers===2?"paliers "+LAINE_S1+" et "+LAINE_S2
+             :"palier "+LAINE_S1)+" "+c[2]+")");
+    }
+    if(v>=LAINE_S2){ pui(c[4]); L.push("+"+t.puis+" puissance "+c[3]); }
+  });
+  if(base.s>=LAINE_S1 && base.i>=LAINE_S1){ pui(["Air"]); L.push("+"+t.puis+" puissance air"); }
+  /* Seuls les bonus ACQUIS sont listés ici ; ce qu'un palier supérieur donnerait se lit
+     dans la description de chaque pièce, sous son emplacement. */
+  L.push("+"+t.proc+" % "+LAINE_PROC+" (non calculé)");
+  return {nom:"Armure nordique en laine", type:"Armure",
+          set:t.n+" pièce"+(t.n>1?"s":"")+" · bonus à paliers", n:null, actif:true,
+          lignes:L, complet:true, raison:null, fixe:true};
+}
+
 function bonusGemmes(base,puisVal){
   var r={stats:{f:0,e:0,d:0,i:0,s:0},pct:{f:0,e:0,d:0,i:0,s:0},ca:0,skills:{},skPct:{},
          puis:{},resi:{},blocs:[]};
@@ -1405,12 +1493,15 @@ function bonusGemmes(base,puisVal){
   /* Objets à condition écrite à la main (l'Œil d'Al-Uqsur et ses semblables). */
   Object.keys(OBJETS_CONDITIONNELS).forEach(function(nom){
     var d=OBJETS_CONDITIONNELS[nom];
+    if(d.groupe) return;                 /* armure nordique en laine : bloc unique, ci-dessous */
     var porte=d.slots.some(function(sl){ return S.eq[sl] && S.eq[sl].n===nom; });
     if(!porte) return;
     var lignes=d.calc(r,base,puisVal);
     r.blocs.push({nom:nom, type:"Objet", set:"effet conditionnel", n:null, actif:true,
                   lignes:lignes, complet:true, raison:null, fixe:true});
   });
+  var laine=bonusLaine(r,base);
+  if(laine) r.blocs.push(laine);
 
   /* Sorts lancés par un objet : inactifs tant que le joueur ne les allume pas. */
   Object.keys(EFFETS_OBJET).forEach(function(nom){
