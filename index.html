@@ -14,7 +14,7 @@
   --line:#c6b99e; --line-soft:#d7cdb8;
   --ink:#241f18; --ink-soft:#584e3f; --ink-faint:#8a7d69;
   --bronze:#8a5f16; --bronze-bright:#a8781f; --bronze-glow:#8a5f1622;
-  --jade:#2f6b4f; --rust:#9b3421;
+  --jade:#2f6b4f; --rust:#9b3421; --vide:#8f2f24;
   --panel:#fbf7ee; --panel-2:#f4eee1;
   --shadow:0 1px 2px #241f1810, 0 8px 24px #241f180d;
 }
@@ -24,7 +24,7 @@
     --line:#333a4a; --line-soft:#282e3b;
     --ink:#e9e3d5; --ink-soft:#a8a292; --ink-faint:#6f6c62;
     --bronze:#c8973f; --bronze-bright:#e0b45c; --bronze-glow:#c8973f1f;
-    --jade:#5c9d78; --rust:#d0664e;
+    --jade:#5c9d78; --rust:#d0664e; --vide:#c95a43;
     --panel:#181b25; --panel-2:#1e222d;
     --shadow:0 1px 2px #0006, 0 10px 30px #0004;
   }
@@ -34,7 +34,7 @@
   --line:#333a4a; --line-soft:#282e3b;
   --ink:#e9e3d5; --ink-soft:#a8a292; --ink-faint:#6f6c62;
   --bronze:#c8973f; --bronze-bright:#e0b45c; --bronze-glow:#c8973f1f;
-  --jade:#5c9d78; --rust:#d0664e;
+  --jade:#5c9d78; --rust:#d0664e; --vide:#c95a43;
   --panel:#181b25; --panel-2:#1e222d;
   --shadow:0 1px 2px #0006, 0 10px 30px #0004;
 }
@@ -214,6 +214,13 @@ input:focus-visible,select:focus-visible{outline:2px solid var(--bronze);outline
 .slot.bloque{opacity:.5}
 .slot.bloque select{cursor:not-allowed}
 .eqinfo .st{color:var(--bronze)}
+/* Un emplacement vide se lit en rouge sombre — libellé et menu — et un emplacement rempli
+   en blanc, la couleur du texte courant. La main gauche prise par une arme à deux mains
+   n'est pas « vide » : elle reste simplement estompée. Les options du menu ouvert gardent
+   la couleur du texte, sans quoi toute la liste hériterait du rouge du menu. */
+.slot.vide:not(.bloque) .sl,.slot.vide:not(.bloque) select{color:var(--vide)}
+.slot.plein .sl{color:var(--ink)}
+.slot select option{color:var(--ink)}
 
 .brow{display:flex;justify-content:space-between;gap:12px;font-size:14.5px;padding-bottom:6px;border-bottom:1px solid var(--line-soft)}
 .brow:last-child{border-bottom:none}
@@ -233,7 +240,7 @@ footer a{color:var(--bronze)}
 <header>
   <div class="hwrap">
     <h1>Neerya <span>T4c</span> Builder</h1>
-    <span class="tag">Version 8.3</span>
+    <span class="tag">Version 8.4</span>
     <div class="hspacer"></div>
     <span class="hsave">
       <select id="psel" aria-label="Mes personnages"></select>
@@ -525,10 +532,12 @@ CLES.forEach(function(k){S.pts[k]=0;});
 function baseStat(){return REN[S.ren].base;}
 /* Les flèches ne s'équipent qu'avec un arc. */
 function arcEquipe(){return !!(S.eq.main && S.eq.main.c==="arc");}
-/* Une arme à deux mains occupe les deux : le wiki le signale dans le nom de l'arme.
+/* Une arme à deux mains occupe les deux : le wiki le signale dans le nom de l'arme, par un
+   marqueur « (2 mains) » sur 28 armes ou en toutes lettres — « Épée à deux mains en mithril »,
+   douze épées de guerrier que le seul marqueur laissait passer (8.4).
    Les arcs n'en font pas partie — ils laissent la main gauche aux flèches. */
 function deuxMains(){
-  return !!(S.eq.main && S.eq.main.c!=="arc" && /\(\s*2\s*mains?\s*\)/i.test(S.eq.main.n));
+  return !!(S.eq.main && S.eq.main.c!=="arc" && /\(\s*2\s*mains?\s*\)|\bdeux mains\b/i.test(S.eq.main.n));
 }
 /* Réservoir de points DE BASE : niveaux, Anwynn et Ebon Hold.
    Les 50 points de l'anneau de lien n'en font pas partie : ce sont des bonus. */
@@ -1623,6 +1632,24 @@ function sortAccessible(s,base){
   if(abs.length) return "à apprendre d'abord : "+abs.join(", ");
   return null;
 }
+/* Un sort appris dont le prérequis n'est plus atteint est oublié à son tour, et ses points
+   de compétence rendus : niveau ou caractéristique PURE redescendus sous le seuil, sort
+   requis oublié. C'est la règle du jeu rejouée à l'envers — le personnage n'aurait jamais
+   pu l'apprendre dans cet état. La boucle tourne jusqu'à ce que plus rien ne bouge, pour
+   que l'oubli se propage le long des chaînes de prérequis (Résistance du golem tombe avec
+   Peau de pierre, qui tombe avec Protection). Rend les noms oubliés, dans l'ordre d'affichage. */
+function oublieSortsInaccessibles(base){
+  var oublies=[], change=true;
+  while(change){
+    change=false;
+    SORTS.forEach(function(s){
+      if(S.sappris[s.n] && sortAccessible(s,base)){
+        S.sappris[s.n]=false; S.sactifs[s.n]=false; oublies.push(s.n); change=true;
+      }
+    });
+  }
+  return oublies;
+}
 function effetsSorts(){
   /* `st`, `sk`… restent les totaux, pour l'affichage ; `stL`, `skL`… gardent chaque sort
      séparément, car c'est ainsi que le jeu applique les pourcentages. */
@@ -1847,17 +1874,9 @@ elSorts.addEventListener("change",function(e){
       }
       S.sappris[n]=true;
     }else{
+      /* Oublier un sort oublie aussi ceux qui en dépendent : c'est render(), par
+         oublieSortsInaccessibles, qui propage l'oubli et nomme les sorts emportés. */
       S.sappris[n]=false; S.sactifs[n]=false;
-      /* oublier un sort oublie aussi ceux qui en dépendent */
-      var change=true;
-      while(change){
-        change=false;
-        SORTS.forEach(function(s){
-          if(S.sappris[s.n] && (s.req||[]).some(function(r){return !S.sappris[r];})){
-            S.sappris[s.n]=false; S.sactifs[s.n]=false; change=true;
-          }
-        });
-      }
     }
     salerte(""); render(); return;
   }
@@ -2069,23 +2088,45 @@ function remplirSelects(v){
     var html='<option value="">— aucun ('+dispo.length+' dispo) —</option>';
     dispo.forEach(function(o){
       var ok=accessible(o,v);
-      html+='<option value="'+o.__i+'"'+(cur===o?' selected':'')+'>'+
+      /* L'infobulle de l'option reprend la fiche de l'objet : le navigateur l'affiche au
+         survol dans le menu ouvert. */
+      html+='<option value="'+o.__i+'"'+(cur===o?' selected':'')+' title="'+titreObjet(o)+'">'+
             (ok?"":"⚠ ")+o.n+(reqTexte(o)?"  ["+reqTexte(o)+"]":"")+'</option>';
     });
     sel.innerHTML=html;
-    var ei=document.getElementById("ei-"+sl.k);
-    if(cur){
-      var bits=[];
-      if(cur.a) bits.push('<span class="st">'+cur.a+"–"+cur.b+" dégâts</span>");
-      if(cur.v) bits.push(cur.v.toFixed(3)+" s");
-      if(cur.a&&cur.v) bits.push(Math.round((cur.a+cur.b)/2/cur.v)+" DPS");
-      if(cur.ca) bits.push('<span class="st">'+cur.ca+" CA</span>");
-      if(cur.p) bits.push("cap dex "+cur.p);
-      /* Bonus réécrits dans une forme unique ; la part gemme est détaillée plus bas. */
-      var d=descriptionObjet(cur); if(d) bits.push(d);
-      ei.innerHTML=bits.join(" · ");
-    } else ei.innerHTML="";
+    /* Un emplacement vide se repère d'un coup d'œil : libellé et menu en rouge sombre ;
+       une fois rempli, le libellé prend la couleur du texte courant. */
+    var slot=sel.closest(".slot");
+    slot.classList.toggle("vide",!cur);
+    slot.classList.toggle("plein",!!cur);
+    document.getElementById("ei-"+sl.k).innerHTML = cur ? ficheObjet(cur) : "";
   });
+}
+/* Fiche d'un objet, en HTML, telle qu'elle s'affiche sous l'emplacement : dégâts, vitesse,
+   DPS, classe d'armure, cap dextérité, puis les bonus réécrits dans une forme unique — la
+   part gemme est détaillée plus bas, sous l'équipement. */
+function ficheObjet(o){
+  var bits=[];
+  if(o.a) bits.push('<span class="st">'+o.a+"–"+o.b+" dégâts</span>");
+  if(o.v) bits.push(o.v.toFixed(3)+" s");
+  if(o.a&&o.v) bits.push(Math.round((o.a+o.b)/2/o.v)+" DPS");
+  if(o.ca) bits.push('<span class="st">'+o.ca+" CA</span>");
+  if(o.p) bits.push("cap dex "+o.p);
+  var d=descriptionObjet(o); if(d) bits.push(d);
+  return bits.join(" · ");
+}
+/* La même fiche en texte nu, prête à servir d'attribut title : la seule façon de décrire
+   une option d'un <select> natif, dont le menu ouvert ne reçoit aucun événement de souris.
+   Chrome, Edge et Firefox sur ordinateur l'affichent au survol ; Safari et les mobiles non.
+   Mise en cache par objet (deux objets portent le même nom : la clé est leur rang, pas
+   leur nom). */
+var CACHE_TITRE={};
+function titreObjet(o){
+  if(CACHE_TITRE[o.__i]===undefined){
+    var t=ficheObjet(o).replace(/<\/?span[^>]*>/g,"");
+    CACHE_TITRE[o.__i]=t.replace(/&/g,"&amp;").replace(/"/g,"&quot;");
+  }
+  return CACHE_TITRE[o.__i];
 }
 
 /* ---------- réécriture normalisée des bonus ----------
@@ -2247,6 +2288,12 @@ function render(){
   document.getElementById("pooltot").textContent=used+" / "+tot+" répartis";
 
   var base={}; CLES.forEach(function(k){base[k]=baseVal(k);});
+  /* Les sorts dont le prérequis n'est plus atteint sont oubliés AVANT tout calcul : leurs
+     bonus ne doivent plus compter, ni leurs points de compétence rester engagés. Le bandeau
+     des sorts le dit, sans quoi un sort disparaîtrait de la liste sans explication. */
+  var oublies=oublieSortsInaccessibles(base);
+  if(oublies.length) salerte((oublies.length>1?"Sorts oubliés":"Sort oublié")+
+    " faute de prérequis : "+oublies.join(", ")+".");
   var eq=cumulEquip();
   /* Armure du dragon rouge d'acuité : la branche retenue dépend de la comparaison des
      valeurs de BASE, en blanc. À égalité, les deux caractéristiques reçoivent la moitié. */
@@ -3063,6 +3110,7 @@ window.__diag={analyse:analyse, coupePassif:coupePassif, resume:resumeFx, arr:ar
                ordreSorts:ORDRE_SORTS,
                etatCourant:etatCourant, versCharge:versCharge, appliquerEtat:appliquerEtat,
                descriptionObjet:descriptionObjet, bonusLisibles:bonusLisibles,
+               objet:function(i){ return OBJ[i]; },
                traitesAPart:TRAITES_A_PART};
 document.getElementById("nbobj").textContent=OBJ.length;
 render();
