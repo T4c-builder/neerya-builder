@@ -221,6 +221,10 @@ input:focus-visible,select:focus-visible{outline:2px solid var(--bronze);outline
 .slot.vide:not(.bloque) .sl,.slot.vide:not(.bloque) select{color:var(--vide)}
 .slot.plein .sl{color:var(--ink)}
 .slot select option{color:var(--ink)}
+/* Les deux groupes du menu — recommandations, puis liste complète — portent un intitulé
+   discret, dans le style des sous-titres de l'interface là où le navigateur l'accepte. */
+.slot select optgroup{color:var(--ink-faint);font-style:normal;font-weight:600;
+  font-size:12px;letter-spacing:.08em;text-transform:uppercase}
 
 .brow{display:flex;justify-content:space-between;gap:12px;font-size:14.5px;padding-bottom:6px;border-bottom:1px solid var(--line-soft)}
 .brow:last-child{border-bottom:none}
@@ -240,7 +244,7 @@ footer a{color:var(--bronze)}
 <header>
   <div class="hwrap">
     <h1>Neerya <span>T4c</span> Builder</h1>
-    <span class="tag">Version 8.4</span>
+    <span class="tag">Version 8.5</span>
     <div class="hspacer"></div>
     <span class="hsave">
       <select id="psel" aria-label="Mes personnages"></select>
@@ -2065,6 +2069,39 @@ function accessible(o,v){
   return true;
 }
 
+/* ---------- recommandations en tête de menu ----------
+   Les cinq « meilleures recommandations » d'un menu sont les objets équipables au plus haut
+   PALIER de prérequis : la somme des cinq caractéristiques requises, lue sur les valeurs
+   pures comme tout prérequis. Trois garde-fous, posés après simulation sur trois profils
+   (un mage, un guerrier, un débutant) :
+   — pas de groupe sous MIN_RECO objets équipables : une liste courte n'a rien à recommander
+     (un débutant n'a que quatre orbes, dont un livre de chants de Noël) ;
+   — jamais un objet sans aucun prérequis (183 dans la base : babioles, objets de quête) ;
+   — à somme égale, le DPS puis la classe d'armure départagent, et deux objets de fiche
+     identique — les capes de couleur, interchangeables — ne comptent que pour un.
+   Le critère dit le palier, pas le meilleur choix pour un build : un mage y verra des bâtons
+   à deux mains même s'il joue bouclier. Les cinq restent aussi à leur place alphabétique
+   dans « Autres équipements », pour que la liste complète reste entière (leçon de la 5.2). */
+var NB_RECO=5, MIN_RECO=10;
+function sommeReq(o){ return (o.rf||0)+(o.re||0)+(o.rd||0)+(o.ri||0)+(o.rs||0); }
+function dpsObj(o){ return o.a&&o.v ? (o.a+o.b)/2/o.v : 0; }
+function recommandations(liste,v){
+  var cand=liste.filter(function(o){ return accessible(o,v); });
+  if(cand.length<MIN_RECO) return [];
+  cand=cand.filter(function(o){ return sommeReq(o)>0; });
+  cand.sort(function(a,b){
+    return (sommeReq(b)-sommeReq(a)) || (dpsObj(b)-dpsObj(a)) || ((b.ca||0)-(a.ca||0))
+        || triCatalogue(a,b);
+  });
+  var out=[], vues={};
+  for(var i=0;i<cand.length && out.length<NB_RECO;i++){
+    var cle=sommeReq(cand[i])+"|"+titreObjet(cand[i]);
+    if(vues[cle]) continue;
+    vues[cle]=true; out.push(cand[i]);
+  }
+  return out;
+}
+
 function remplirSelects(v){
   SLOTS.forEach(function(sl){
     var sel=elSlots.querySelector('select[data-slot="'+sl.k+'"]');
@@ -2085,14 +2122,23 @@ function remplirSelects(v){
     var dispo=liste.filter(function(o){return S.showall||accessible(o,v);});
     var cur=S.eq[sl.k];
     if(cur && dispo.indexOf(cur)<0) dispo=[cur].concat(dispo);
+    /* L'infobulle de l'option reprend la fiche de l'objet : le navigateur l'affiche au
+       survol dans le menu ouvert. */
+    function option(o,choisi){
+      return '<option value="'+o.__i+'"'+(choisi?' selected':'')+' title="'+titreObjet(o)+'">'+
+             (accessible(o,v)?"":"⚠ ")+o.n+(reqTexte(o)?"  ["+reqTexte(o)+"]":"")+'</option>';
+    }
     var html='<option value="">— aucun ('+dispo.length+' dispo) —</option>';
-    dispo.forEach(function(o){
-      var ok=accessible(o,v);
-      /* L'infobulle de l'option reprend la fiche de l'objet : le navigateur l'affiche au
-         survol dans le menu ouvert. */
-      html+='<option value="'+o.__i+'"'+(cur===o?' selected':'')+' title="'+titreObjet(o)+'">'+
-            (ok?"":"⚠ ")+o.n+(reqTexte(o)?"  ["+reqTexte(o)+"]":"")+'</option>';
-    });
+    /* Les recommandations ouvrent le menu ; l'objet porté n'y est jamais marqué « selected »,
+       c'est sa copie de la liste complète qui l'est — une seule option choisie par menu. */
+    var reco=recommandations(liste,v);
+    if(reco.length){
+      html+='<optgroup label="Meilleures recommandations">'+
+            reco.map(function(o){ return option(o,false); }).join("")+'</optgroup>'+
+            '<optgroup label="Autres équipements">';
+    }
+    dispo.forEach(function(o){ html+=option(o,cur===o); });
+    if(reco.length) html+='</optgroup>';
     sel.innerHTML=html;
     /* Un emplacement vide se repère d'un coup d'œil : libellé et menu en rouge sombre ;
        une fois rempli, le libellé prend la couleur du texte courant. */
