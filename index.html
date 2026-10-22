@@ -244,7 +244,7 @@ footer a{color:var(--bronze)}
 <header>
   <div class="hwrap">
     <h1>Neerya <span>T4c</span> Builder</h1>
-    <span class="tag">Version 8.5</span>
+    <span class="tag">Version 8.6</span>
     <div class="hspacer"></div>
     <span class="hsave">
       <select id="psel" aria-label="Mes personnages"></select>
@@ -494,9 +494,14 @@ Object.keys(PARSLOT).forEach(function(k){ PARSLOT[k].sort(triCatalogue); });
 /* Récompenses de l'anneau de lien, plafonds imposés par le jeu (150 bons de ravitaillement) */
 var ELEMS=["Feu","Eau","Air","Terre","Lumière","Nécromancie"];
 var BASIQUES=["Attaque","Archerie","Esquive"];
-var SPECIALISEES=["Coup assommant","Coup puissant","Parade","Guérison rapide","Transpercer l'armure",
-  "Chercher","Coup d'oeil","Crochetage de serrures","Dissimulation","Méditation","Premiers soins",
-  "Ramener à la vie","Se faufiler","Voler","Piller"];
+/* Les huit compétences spécialisées que l'anneau peut majorer de 15 — liste relevée en jeu
+   par Bertrand (8.6), dans l'ordre du jeu. Les sept autres (Coup assommant, Chercher, Coup
+   d'oeil, Ramener à la vie, Se faufiler, Piller, et Transpercer l'armure qui a sa propre
+   récompense) n'y sont pas. Les noms sont ceux de la base du wiki ; le jeu dit « Se cacher »
+   pour Dissimulation, d'où l'étiquette. */
+var SPECIALISEES=["Coup puissant","Parade","Guérison rapide","Méditation","Premiers soins",
+  "Dissimulation","Voler","Crochetage de serrures"];
+var ETIQUETTE_COMP={"Dissimulation":"Dissimulation (Se cacher)"};
 var MAX_RING_STATS=50, MAX_RING_PV=400, MAX_RING_EL=20;
 
 /* Puissances et résistances : 100 de base partout, sauf la résistance à la lumière.
@@ -852,6 +857,7 @@ function analyse(txt,sansCoupe){
     "guerison rapide":"Guérison rapide","guerrison rapide":"Guérison rapide",
     "chance":"Chance","vol":"Voler",
     "meditation":"Méditation","premiers soins":"Premiers soins","dissimulation":"Dissimulation",
+    "se cacher":"Dissimulation",
     "ramener a la vie":"Ramener à la vie","resurrection":"Ramener à la vie",
     "piller":"Piller","se faufiler":"Se faufiler","faufiler":"Se faufiler",
     "chercher":"Chercher","coup d'oeil":"Coup d'oeil","coup d oeil":"Coup d'oeil",
@@ -868,13 +874,18 @@ function analyse(txt,sansCoupe){
     });
     mark(m); return " ";
   });
+  /* Chaque bonus lu est CONSOMMÉ : sans cela, « +5 crochetage de serrures » serait compté
+     par « crochetage de serrures » puis une seconde fois par « crochetage » (8.6 — latent,
+     aucun texte du wiki ne le déclenchait). L'ordre de SK est donc significatif : une graphie
+     longue doit précéder son raccourci (« se faufiler » avant « faufiler »), et c'est aussi
+     l'ordre dans lequel les compétences s'énoncent dans la description. */
   Object.keys(SK).forEach(function(nom){
     /* « 1 chance sur 4 », « 6% chance de lancer » décrivent une probabilité, pas un bonus
        de la compétence Chance. On exige donc que rien ne suive. */
     var apres = nom==="chance" ? "(?!\\s*(?:sur|de\\b|d'))" : "";
     var r=new RegExp("([+-]?\\d+)\\s*(?:en |de |d'|competence |a la |au )?"+
                      nom.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+apres,"g");
-    t.replace(r,function(m,v){res.skills[SK[nom]]=(res.skills[SK[nom]]||0)+ +v;mark(m);return m;});
+    t=t.replace(r,function(m,v){res.skills[SK[nom]]=(res.skills[SK[nom]]||0)+ +v;mark(m);return " ";});
   });
   /* puissances et résistances */
   /* Le wiki désigne la nécromancie de trois façons selon les pages. */
@@ -1060,7 +1071,8 @@ function grilleMini(champs){
        '<label><input type="radio" name="rcomp" value="" checked><span>Aucune</span></label>'+
        '<label><input type="radio" name="rcomp" value="base"><span>+300 dans une compétence de base'+
          '<small>Attaque, archerie ou esquive.</small></span></label>'+
-       '<label><input type="radio" name="rcomp" value="spec"><span>+15 dans une compétence spécialisée</span></label>'+
+       '<label><input type="radio" name="rcomp" value="spec"><span>+15 dans une compétence spécialisée'+
+         '<small>Coup puissant, parade, guérison rapide, méditation, premiers soins, dissimulation (se cacher), voler ou crochetage de serrures.</small></span></label>'+
        '<label><input type="radio" name="rcomp" value="ta"><span>+60 en transpercer l\'armure'+
          '<small>À la place du bonus de 15, pas en plus.</small></span></label>'+
      '</div>'+
@@ -2040,9 +2052,9 @@ function majCompetences(base,eq,fx,calc){
 function majCompSelect(){
   var sel=document.getElementById("rcompnom"), ty=S.ring.comp.type, garde=S.ring.comp.nom;
   if(ty==="base"||ty==="spec"){
-    var liste = ty==="base" ? BASIQUES
-              : SPECIALISEES.filter(function(n){return n!=="Transpercer l\'armure";});
-    sel.innerHTML=liste.map(function(n){return '<option>'+n+'</option>';}).join("");
+    var liste = ty==="base" ? BASIQUES : SPECIALISEES;
+    sel.innerHTML=liste.map(function(n){
+      return '<option value="'+n+'">'+(ETIQUETTE_COMP[n]||n)+'</option>'; }).join("");
     sel.style.display="";
     sel.value = liste.indexOf(garde)>=0 ? garde : liste[0];
     S.ring.comp.nom=sel.value;
@@ -2886,6 +2898,11 @@ function appliquerEtat(o){
     S.ring.puis[e]=(rg.p&&+rg.p[e])||0;
     S.ring.resi[e]=(rg.r&&+rg.r[e])||0;
   });
+  /* Une sauvegarde d'avant la 8.6 peut viser une compétence que l'anneau ne majore pas :
+     majCompSelect la ramènera à la première de la liste, autant le dire. */
+  if(S.ring.comp.type==="spec" && SPECIALISEES.indexOf(S.ring.comp.nom)<0)
+    soucis.push("compétence de l'anneau de lien non éligible : "+S.ring.comp.nom+
+                ", remplacée par "+SPECIALISEES[0]);
 
   S.eq={};
   var perdus=[];
