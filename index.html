@@ -179,6 +179,9 @@ input:focus-visible,select:focus-visible{outline:2px solid var(--bronze);outline
 .sortrow .meta{font-size:12px;color:var(--ink-faint)}
 .sortrow .fx{font-size:12.5px;color:var(--jade)}
 .sortrow .bloque{font-size:12.5px;color:var(--rust)}
+/* ce que fera le clic quand la chaîne des sorts requis est réalisable : une annonce, pas un refus */
+.sortrow .bloque.casc{color:var(--bronze)}
+#salerte{white-space:pre-line}
 .step{display:flex;align-items:center;gap:3px}
 .step b{flex:1;text-align:center;font-family:Cinzel,serif;font-size:14px;color:var(--bronze-bright);font-variant-numeric:tabular-nums}
 .step .pm{min-width:24px;height:24px;font-size:14px;padding:0 3px}
@@ -244,7 +247,7 @@ footer a{color:var(--bronze)}
 <header>
   <div class="hwrap">
     <h1>Neerya <span>T4c</span> Builder</h1>
-    <span class="tag">Version 8.6</span>
+    <span class="tag">Version 8.7</span>
     <div class="hspacer"></div>
     <span class="hsave">
       <select id="psel" aria-label="Mes personnages"></select>
@@ -1648,6 +1651,59 @@ function sortAccessible(s,base){
   if(abs.length) return "à apprendre d'abord : "+abs.join(", ");
   return null;
 }
+/* ---------- apprentissage en cascade (8.7) ----------
+   Retour d'un joueur : un personnage de haut niveau qui a les caractéristiques d'un sort mais
+   aucun des sorts qui y mènent devait cocher toute la chaîne un par un. Cocher le sort apprend
+   désormais d'un coup les sorts requis qui manquent — à condition que CHACUN d'eux soit
+   lui-même à portée (niveau, caractéristiques pures) et que les points de compétence couvrent
+   le tout. C'est tout ou rien : rien n'est appris si un seul maillon manque, et le bandeau dit
+   lequel. Un sort requis peut exiger plus que le sort visé — Vague régénératrice ne demande
+   aucune sagesse, Neige éternelle qui y mène en demande 59 — d'où le contrôle maillon par
+   maillon. */
+/* Ce qui manque au personnage pour CE sort, hors sorts requis : niveau et caractéristiques. */
+function prerequisPropres(s,base){
+  var m=[];
+  if(S.niveau<s.niv) m.push("niveau "+s.niv+" (tu es niveau "+S.niveau+")");
+  ["f","e","i","s"].forEach(function(k){
+    if(s.r[k] && base[k]<s.r[k])
+      m.push(s.r[k]+" en "+LIB[k][0].toLowerCase()+" (tu en as "+base[k]+")");
+  });
+  return m;
+}
+/* Les sorts requis pas encore appris, de proche en proche. Un sort déjà appris arrête la
+   descente : oublieSortsInaccessibles garantit que sa propre chaîne l'est aussi. `vus` sert
+   à la fois de dédoublonnage (deux branches qui se rejoignent) et de garde contre un cycle. */
+function requisManquants(nom){
+  var vus={}, liste=[], inconnus=[];
+  (function suit(n){
+    ((PAR_NOM[n]&&PAR_NOM[n].req)||[]).forEach(function(r){
+      if(vus[r]) return;
+      vus[r]=true;
+      if(!PAR_NOM[r]){ inconnus.push(r); return; }
+      if(S.sappris[r]) return;
+      suit(r); liste.push(PAR_NOM[r]);
+    });
+  })(nom);
+  /* rangés comme la liste affichée : par niveau requis, puis par nom */
+  liste.sort(function(a,b){ return (a.niv||0)-(b.niv||0) || a.n.localeCompare(b.n,"fr"); });
+  return {liste:liste, inconnus:inconnus};
+}
+/* Le plan complet pour apprendre `s` : les sorts requis à apprendre avec lui, le coût total,
+   et tout ce qui s'y oppose (`manques`, vide si le plan est réalisable). */
+function planCascade(s,base){
+  var rq=requisManquants(s.n), manques=[], cout=0;
+  rq.inconnus.forEach(function(n){ manques.push(n+" : sort requis introuvable dans la liste"); });
+  rq.liste.concat([s]).forEach(function(t){
+    cout+=t.pc||0;
+    var m=prerequisPropres(t,base);
+    if(m.length) manques.push(t.n+" : "+m.join(", "));
+  });
+  var reste=totalPtsComp()-utilisesComp();
+  if(cout>reste) manques.push((cout-reste)+" point"+(cout-reste>1?"s":"")+" de compétence : "+
+    cout+" nécessaires, "+reste+" disponible"+(reste>1?"s":""));
+  return {requis:rq.liste, noms:rq.liste.map(function(t){return t.n;}),
+          cout:cout, reste:reste, manques:manques};
+}
 /* Un sort appris dont le prérequis n'est plus atteint est oublié à son tour, et ses points
    de compétence rendus : niveau ou caractéristique PURE redescendus sous le seuil, sort
    requis oublié. C'est la règle du jeu rejouée à l'envers — le personnage n'aurait jamais
@@ -1851,7 +1907,16 @@ document.getElementById("gemmes").addEventListener("click",function(e){
 });
 
 var elSal=document.getElementById("salerte");
-function salerte(m){ elSal.textContent=m||""; elSal.classList.toggle("on",!!m); }
+/* `info` : le message annonce ce qui vient d'être fait, pas un refus — bronze au lieu de rouge.
+   `ephemere` : le message commente UN clic sur un sort (refus, chaîne apprise). Il s'efface au
+   prochain render(), sans quoi « il manque 54 points » resterait affiché après que le joueur a
+   monté de niveau. Le message des sorts oubliés, lui, est posé par render() et y survit. */
+var salEphemere=false;
+function salerte(m,info,ephemere){
+  elSal.textContent=m||""; elSal.classList.toggle("on",!!m);
+  elSal.classList.toggle("info",!!m&&!!info);
+  salEphemere=!!m&&!!ephemere;
+}
 
 function majSorts(base,fxNotes){
   SORTS.forEach(function(s){
@@ -1861,10 +1926,23 @@ function majSorts(base,fxNotes){
     var montre=S.sall||!blocage||appris;
     ligne.style.display=montre?"":"none";
     var a=ligne.querySelector("[data-sappr]"), c=ligne.querySelector("[data-sact]");
-    a.checked=appris; a.disabled=!!blocage&&!appris;
+    /* Niveau et caractéristiques atteints, seuls des sorts requis manquent : la case reste
+       cochable, elle apprendra toute la chaîne (8.7). La ligne annonce ce que le clic fera —
+       ou, en rouge, pourquoi il sera refusé. Ces lignes ne sont visibles qu'avec « Afficher
+       aussi les sorts hors de portée ». */
+    var plan=(blocage&&!appris&&!prerequisPropres(s,base).length)?planCascade(s,base):null;
+    a.checked=appris; a.disabled=!!blocage&&!appris&&!plan;
     c.checked=!!S.sactifs[s.n]; c.disabled=!appris;
     ligne.classList.toggle("actif",!!S.sactifs[s.n]);
-    ligne.querySelector(".bloque").textContent=(blocage&&!appris)?blocage:"";
+    var bl=ligne.querySelector(".bloque"), txt=(blocage&&!appris)?blocage:"";
+    if(plan){
+      var liste=plan.noms.join(", ");
+      txt=plan.manques.length
+        ? "Sort"+(plan.noms.length>1?"s":"")+" requis : "+liste+". Impossible de tout apprendre d'un clic — il manque "+plan.manques.join(" ; ")+"."
+        : "Un clic apprend aussi : "+liste+" — "+plan.cout+" points de compétence en tout.";
+    }
+    bl.textContent=txt;
+    bl.classList.toggle("casc",!!plan&&!plan.manques.length);
   });
   var nb=Object.keys(S.sappris).filter(function(n){return S.sappris[n];}).length;
   var act=Object.keys(S.sactifs).filter(function(n){return S.sactifs[n];}).length;
@@ -1874,7 +1952,9 @@ function majSorts(base,fxNotes){
   document.getElementById("snote").innerHTML=
     "<b>Appris</b> consomme définitivement des points de compétence — "+ptsSorts()+
     " au total pour l'instant. <b>Lancé</b> applique les bonus aux statistiques, "+
-    "en vert. Certains sorts s'excluent : en activer un en éteint automatiquement d'autres.";
+    "en vert. Certains sorts s'excluent : en activer un en éteint automatiquement d'autres. "+
+    "Avec « Afficher aussi les sorts hors de portée », cocher un sort dont tu as le niveau et "+
+    "les caractéristiques apprend d'un coup tous les sorts requis qui lui manquent.";
 }
 
 elSorts.addEventListener("change",function(e){
@@ -1883,10 +1963,35 @@ elSorts.addEventListener("change",function(e){
     var n=a.dataset.sappr;
     if(a.checked){
       var s=PAR_NOM[n], reste=totalPtsComp()-utilisesComp();
+      var base={}; CLES.forEach(function(k){base[k]=baseVal(k);});
+      var plan=planCascade(s,base);
+      var puces=function(){ return plan.manques.map(function(m){return "• "+m;}).join("\n"); };
+      if(plan.requis.length){
+        /* Des sorts requis manquent : tout apprendre d'un coup, ou rien (8.7). */
+        var nb=plan.requis.length;
+        if(plan.manques.length){
+          a.checked=false;
+          salerte("Action impossible : apprendre "+n+" demande d'apprendre aussi "+
+            (nb>1?nb+" sorts requis":"un sort requis")+" ("+plan.noms.join(", ")+
+            "), et il manque :\n"+puces(),false,true);
+          return;
+        }
+        plan.requis.forEach(function(t){ S.sappris[t.n]=true; });
+        S.sappris[n]=true;
+        /* render() d'abord : il efface le message éphémère précédent */
+        render();
+        salerte(n+" appris avec "+(nb>1?"ses "+nb+" sorts requis":"son sort requis")+" ("+
+          plan.noms.join(", ")+") — "+plan.cout+" points de compétence engagés.",true,true);
+        return;
+      }
       if((s.pc||0)>reste){
         a.checked=false;
-        salerte("Il ne reste que "+reste+" points de compétence : "+n+" en demande "+s.pc+".");
+        salerte("Il ne reste que "+reste+" points de compétence : "+n+" en demande "+s.pc+".",false,true);
         return;
+      }
+      /* garde-fou : la case d'un sort hors de portée est désactivée, on ne passe pas ici */
+      if(plan.manques.length){
+        a.checked=false; salerte("Action impossible, il manque :\n"+puces(),false,true); return;
       }
       S.sappris[n]=true;
     }else{
@@ -2289,6 +2394,7 @@ function descriptionObjet(o){
 }
 
 function render(){
+  if(salEphemere) salerte("");
   var lvl=S.niveau;
   document.getElementById("lvlbig").textContent=lvl;
   document.getElementById("lvlrange").value=lvl;
